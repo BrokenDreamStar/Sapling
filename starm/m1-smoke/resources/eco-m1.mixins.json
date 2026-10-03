@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8.7",
+  "package": "starm.m1.core.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "target": "@env(PREINIT)",
+  "mixins": [
+    "M1SmokeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

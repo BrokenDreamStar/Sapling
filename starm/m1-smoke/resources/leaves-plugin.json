@@ -1,0 +1,17 @@
+{
+  "name": "EcoM1Smoke",
+  "version": "0.1.0",
+  "main": "starm.m1.plugin.M1Plugin",
+  "api-version": "26.1.2",
+  "description": "M1 smoke test for leavesclip plugin mixins",
+  "authors": ["StarM"],
+  "features": {
+    "required": ["mixin"]
+  },
+  "mixin": {
+    "package-name": "starm.m1.core",
+    "mixins": [
+      "eco-m1.mixins.json"
+    ]
+  }
+}
