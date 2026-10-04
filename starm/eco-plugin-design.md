@@ -65,12 +65,19 @@ EntityCollisionOptimizer-Leaves.jar
 | `ServerPlayerMixin#setGameMode` | 两个重载 | 钉 `(Lnet/minecraft/world/level/GameType;)Z` |
 | `ServerLevelAccessor` / `PersistentEntitySectionManagerAccessor` | Moonrise 重写后 `ServerLevel` **无 `entityManager` 字段** | 整体删除；引导改用 `ServerLevel.getAllEntities()` |
 
-### 4.3 Moonrise 带来的功能边界（重要）
+### 4.3 Moonrise 实体查询适配（查询加速已恢复）
 
-- Leaves 26.1.2 含 Moonrise 分块系统：实体查询走 `ca.spottedleaf.moonrise...EntityLookup`（无 vanilla `EntitySectionStorage.getEntities` 活跃路径）→ **ECO 的"存储层实体查询"优化在当前适配下不生效**（不报错、静默直通 vanilla/Moonrise 路径）
-- 追踪回调 **仍然有效**：`ServerLevel$EntityCallbacks` 依旧是 Moonrise `ServerEntityLookup` 的 LevelCallback → native 索引的增删改同步正常
-- 保留生效的优化：推动批处理（LivingEntity#pushEntities）、移动碰撞（Entity#move/collide/collideBoundingBox）、实体箱碰撞（getEntityCollisions）、方块掩码、队伍/状态缓存等
-- 后续可选：把查询钩子改挂 Moonrise 查询入口（需核对迭代顺序语义），恢复查询优化
+- 引擎漏斗已定位（@Mixin `EntityLookup`，共挂 5 处，全部 HEAD 取消 → 原生索引服务）：
+  - **List 形（引擎主路径，Level#getEntities / Level#getEntitiesOfClass 直接调用）**：
+    - `getEntities(Entity, AABB, List, Predicate)`（untyped）
+    - `getEntities(EntityType, AABB, List, Predicate)`（exact-type；EntityType 本身即 EntityTypeTest）
+    - `getEntities(Class, Entity, AABB, List, Predicate)`（class；`EntityTypeTest.forClass` 映射）
+  - **LevelEntityGetter 兼容层**：`get(EntityTypeTest, AABB, AbortableIterationConsumer)`、`get(AABB, Consumer)`
+  - maxCount 受限变体不挂钩（保持平台服务；`/ecoverify` 也用它作无污染基准）
+- **恢复实现**：`MoonriseEntityQueryMixin`（`leaves/java`，priority 1100）；`CollisionFrame.engage/queriesEnabled`（ServerLevel 构造完成后才可服务，复刻旧版 attach 时机）；`QueryHookState` 计数与开关（`-Deco.queryHook=false` 可禁用）
+- 删除死代码：原 `EntitySectionStorageMixin`/`EntitySectionStorageLevelBinding`（Moonrise 下 `EntitySectionStorage` 从不加载，实测该 mixin 从未应用）
+- **顺序语义说明**：Moonrise 遍历 = region(z,x)→chunk(z,x)→section(y)→实体精确相交；vanilla = x→(y,z) section 序。两者**集合语义一致、跨区块顺序可能不同**；原生索引按 mod 契约保持 vanilla 序（与插件已生效的推动/移动路径同一取向）。用 `/ecoverify` 实测集合一致性并报告顺序差异
+- 追踪回调仍然有效（`ServerLevel$EntityCallbacks` 是 Moonrise `ServerEntityLookup` 的 LevelCallback）→ native 索引增删改同步正常
 
 ### 4.4 新增文件（leaves/ 目录，Fabric 构建不受影响）
 
@@ -93,6 +100,12 @@ zsh eco-leaves-port/leaves/build-plugin.sh
 # 已验证的测试脚本
 zsh eco-leaves-port/leaves/run-m2-test.sh     # 启动 + /eco + FFM 证据
 zsh eco-leaves-port/leaves/run-m3-stress.sh   # 200 实体压测（带清理）
+zsh eco-leaves-port/leaves/run-r2-test.sh     # 查询钩子校验（60 实体 + /ecoverify，带清理）
+
+# 服务器内诊断命令
+# /ecoverify  —— 对比 native 结果与 Moonrise 遍历：setMismatch 必须为 0；
+#                 orderDiff 为信息性（跨区块顺序差异，原生保持 vanilla 序）；
+#                 servedQueries 为钩子命中计数
 ```
 
 ## 6. 验证记录
@@ -105,7 +118,7 @@ zsh eco-leaves-port/leaves/run-m3-stress.sh   # 200 实体压测（带清理）
 
 ## 7. 已知限制与后续
 
-1. **查询优化未生效**（Moonrise，见 4.3）——如需恢复，评估挂接 Moonrise 查询入口的可行性
+1. **查询顺序语义**（Moonrise，见 4.3）——集合一致性由 `/ecoverify` 实测保证；跨区块返回顺序为 vanilla 序（mod 契约），与 Moonrise 原生顺序可能不同，如需完全跟随平台顺序可用 `-Deco.queryHook=false` 关闭钩子
 2. **leavesclip mixin 为实验特性**——服务器升级 Leaves 版本后需重跑 M2 冒烟
 3. **本分支与 Fabric 主线的同步**：`leaves-port` 分支对共享文件做了 Paper 化适配（4.2），从 `origin/26.1` 合并时注意这 5 处冲突
 4. **分发**（若公开）：文档注明启动参数；GPL 合规三件套（源码/声明/修改说明）
