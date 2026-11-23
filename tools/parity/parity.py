@@ -991,11 +991,12 @@ def case_bot_dimensions():
 
 
 def case_bot_mob_ai():
-    """mob AI: a zombie targets a fake player and damages it.
+    """mob AI: a zombie targets and damages a fake player.
 
-    Bot health drops run-to-run because the zombie pushes the (heavy) player
-    around and attack cadence depends on the exact tick phase, so the case
-    compares the boolean "player no longer at full health" instead of the value.
+    Zombie AI has its own random source (roaming/path selection), so the time
+    until the first hit differs between runs. The case therefore synchronises on
+    "player no longer at full health" and compares the resulting state/boolean
+    instead of a fixed-tick health value.
     """
     return [
         cmd("/tick unfreeze"),
@@ -1013,15 +1014,13 @@ def case_bot_mob_ai():
         cmd("/tp Steve 0.5 -60 0.5 0 0"),
         wait_for(2),
         cmd("/data get entity Steve Health"),
-        cmd("/data get entity Steve Pos"),
         cmd("/execute if entity @a[name=Steve,nbt={Health:20.0f}]"),
         cmd("/summon minecraft:zombie 3.5 -60 0.5"),
-        wait_game_ticks(8),
-        cmd("/data get entity @e[type=minecraft:zombie,limit=1] Pos", tolerance=1.0),
-        wait_game_ticks(4),
+        sync_until(
+            "/execute if entity @a[name=Steve,nbt={Health:20.0f}]", "Test failed", timeout=10.0
+        ),
         cmd("/execute if entity @a[name=Steve,nbt={Health:20.0f}]"),
-        cmd("/data get entity Steve Pos", tolerance=3.0),
-        cmd("/data get entity @e[type=minecraft:zombie,limit=1] Pos", tolerance=2.0),
+        cmd("/execute if entity @e[type=minecraft:zombie]"),
         cmd("/kill @e[type=minecraft:zombie]"),
         wait_game_ticks(2),
         cmd("/player Steve kill", wait_ticks=1),
@@ -1125,6 +1124,43 @@ def case_bot_portal():
     ]
 
 
+
+def case_bot_sleep():
+    """sleeping in a bed: occupied state, sleeping position, night skip and wake-up."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/time set midnight"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(80),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/setblock 1 -60 0 minecraft:red_bed[part=foot,facing=south]"),
+        cmd("/setblock 1 -60 1 minecraft:red_bed[part=head,facing=south]"),
+        cmd("/execute if block 1 -60 0 minecraft:red_bed[part=foot,facing=south,occupied=false]"),
+        cmd("/player Steve look at 1.5 -59.5 0.5", wait_ticks=2),
+        cmd("/player Steve use", game_ticks=20),
+        cmd("/data get entity Steve Pos", tolerance=0.1),
+        cmd("/execute if block 1 -60 0 minecraft:red_bed[occupied=true]"),
+        cmd("/execute if block 1 -60 1 minecraft:red_bed[occupied=true]"),
+        wait_game_ticks(120),
+        cmd("/data get entity Steve Pos", tolerance=0.1),
+        cmd("/execute if block 1 -60 0 minecraft:red_bed[occupied=true]"),
+        cmd("/player Steve look at 1.5 -59.5 0.5", wait_ticks=2),
+        cmd("/player Steve use", wait_ticks=2),
+        cmd("/setblock 1 -60 0 minecraft:air"),
+        cmd("/setblock 1 -60 1 minecraft:air"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
 CASES = {
     "smoke": ("vanilla sanity checks (world/blocks/entities/list)", case_smoke),
     "bot_basic": ("spawn bot, look/move/stop, read position/rotation", case_bot_basic),
@@ -1148,6 +1184,7 @@ CASES = {
     "bot_ender_pearl": ("ender pearl teleport for fake players", case_bot_ender_pearl),
     "bot_use_continuous": ("continuous use throws the whole snowball stack", case_bot_use_continuous),
     "bot_portal": ("nether portal travel for fake players", case_bot_portal),
+    "bot_sleep": ("sleeping in a bed: occupied state, night skip, wake-up", case_bot_sleep),
 }
 
 

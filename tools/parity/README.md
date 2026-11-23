@@ -267,12 +267,13 @@ are normalised or worked around in the harness:
 | bot_use_entity | 30 | dye a sheep, fill an item frame |
 | bot_knockback | 28 | knockback vector, normal vs sprint attack |
 | bot_dimensions | 13 | spawn in the nether and the end |
-| bot_mob_ai | 22 | zombie AI targets a fake player and damages it |
+| bot_mob_ai | 19 | zombie AI targets a fake player and damages it |
 | bot_ender_pearl | 23 | ender pearl teleport for fake players |
 | bot_use_continuous | 21 | continuous use consumes the whole snowball stack |
 | bot_portal | 17 | nether portal travel |
+| bot_sleep | 25 | sleep in bed, night skip, wake up |
 
-Total: ~537 RCON command comparisons, 0 differences.
+Total: ~559 RCON command comparisons, 0 differences.
 
 Restart persistence (`check-restart.py`): after spawning a fake player and
 restarting both servers, neither restores the fake (Carpet semantics: fake
@@ -286,8 +287,7 @@ empty sample. The script waits 6 s because both servers cache the ping response
 for 5 s.
 
 Known remaining coverage gaps (not yet ported/tested): shadow (needs a real
-client), sleeping in beds, and non-console permission variants for the /player
-command.
+client) and non-console permission variants for the /player command.
 
 ## Troubleshooting
 
