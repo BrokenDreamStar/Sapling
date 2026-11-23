@@ -255,7 +255,7 @@ are normalised or worked around in the harness:
 | bot_mine | 30 | creative instant break, survival hand mining |
 | bot_mount | 23 | mount/dismount boat, position while riding |
 | bot_cmd_errors | 30 | command tree/argument error parity |
-| bot_spawn | 28 | spawn argument matrix (pos/facing/dim/gamemode/spectator) |
+| bot_spawn | 27 | spawn argument matrix (pos/facing/dim/gamemode/spectator) |
 | bot_fall | 12 | fall damage on a survival fake player |
 | bot_death | 19 | death by /damage, list removal, item drops |
 | bot_playerdata | 17 | playerdata saved on disconnect and reloaded |
@@ -266,7 +266,7 @@ are normalised or worked around in the harness:
 | bot_knockback | 28 | knockback vector, normal vs sprint attack |
 | bot_dimensions | 13 | spawn in the nether and the end |
 
-Total: ~456 RCON command comparisons, 0 differences.
+Total: ~455 RCON command comparisons, 0 differences.
 
 Known remaining coverage gaps (not yet ported/tested): shadow (needs a real
 client), fake-player interaction with mob AI targeting, sleeping in beds,

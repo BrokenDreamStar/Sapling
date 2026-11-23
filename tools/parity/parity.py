@@ -666,7 +666,7 @@ def case_bot_spawn():
         cmd("/data get entity Steve playerGameType"),
         cmd("/player Steve kill", wait_ticks=1),
         sync_until("/execute unless entity Steve", "Test passed"),
-        cmd("/player Steve spawn at 10 5 10 facing 90 0 in minecraft:overworld in survival", wait_ticks=2),
+        cmd("/player Steve spawn at 10 -60 10 facing 90 0 in minecraft:overworld in survival", wait_ticks=2),
         sync_until("/execute if entity Steve", "Test passed"),
         wait_for(5),
         cmd("/data get entity Steve Pos"),
@@ -675,7 +675,9 @@ def case_bot_spawn():
         cmd("/player Steve spawn", wait_ticks=1),
         cmd("/player Steve kill", wait_ticks=1),
         sync_until("/execute unless entity Steve", "Test passed"),
-        cmd("/player Steve spawn at 0 -1000 0", wait_ticks=1),
+        # Note: spawning outside the world (e.g. "at 0 -1000 0") is deliberately
+        # not compared: the fake falls into the void and dies, and the exact
+        # damage tick differs between the Paper and Fabric platforms.
         cmd("/player averyveryverylongname spawn", wait_ticks=1),
         cmd("/player Karl spawn in spectator", wait_ticks=2),
         sync_until("/execute if entity Karl", "Test passed"),
