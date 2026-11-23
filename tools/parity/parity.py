@@ -288,15 +288,16 @@ def normalize(text, decimals=3, mask_patterns=None, command=None):
 # Command steps and built-in cases
 # ---------------------------------------------------------------------------
 class Step:
-    __slots__ = ("command", "wait_ticks", "note", "sync_expect", "sync_timeout", "game_ticks")
+    __slots__ = ("command", "wait_ticks", "note", "sync_expect", "sync_timeout", "game_ticks", "tolerance")
 
-    def __init__(self, command, wait_ticks=0.0, note=None, sync_expect=None, sync_timeout=15.0, game_ticks=0.0):
+    def __init__(self, command, wait_ticks=0.0, note=None, sync_expect=None, sync_timeout=15.0, game_ticks=0.0, tolerance=None):
         self.command = command
         self.wait_ticks = float(wait_ticks)
         self.note = note
         self.sync_expect = sync_expect
         self.sync_timeout = float(sync_timeout)
         self.game_ticks = float(game_ticks)
+        self.tolerance = tolerance
 
     def __repr__(self):
         if self.command is None:
@@ -304,8 +305,8 @@ class Step:
         return "Step(" + self.command + ")"
 
 
-def cmd(command, wait_ticks=0.0, game_ticks=0.0):
-    return Step(command, wait_ticks, game_ticks=game_ticks)
+def cmd(command, wait_ticks=0.0, game_ticks=0.0, tolerance=None):
+    return Step(command, wait_ticks, game_ticks=game_ticks, tolerance=tolerance)
 
 
 def wait_game_ticks(ticks):
@@ -985,6 +986,132 @@ def case_bot_dimensions():
     ]
 
 
+
+def case_bot_mob_ai():
+    """mob AI: a zombie targets, pushes and attacks a fake player (tick-synced).
+
+    Attack cadence is identical, but the sampled health depends on the exact
+    tick the query lands on, so per-step tolerances are used.
+    """
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/gamerule natural_regeneration false"),
+        cmd("/time set midnight"),
+        cmd("/kill @e[type=minecraft:zombie]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(80),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/data get entity Steve Health"),
+        cmd("/data get entity Steve Pos"),
+        cmd("/summon minecraft:zombie 3.5 -60 0.5"),
+        wait_game_ticks(20),
+        cmd("/data get entity Steve Health", tolerance=4.0),
+        cmd("/data get entity Steve Pos", tolerance=2.0),
+        cmd("/data get entity @e[type=minecraft:zombie,limit=1] Pos", tolerance=2.0),
+        cmd("/kill @e[type=minecraft:zombie]"),
+        wait_game_ticks(2),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+def case_bot_ender_pearl():
+    """ender pearl teleport works for fake players (FakeClientConnection isOpen)."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(80),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/item replace entity Steve hotbar.0 with minecraft:ender_pearl 1"),
+        cmd("/player Steve hotbar 1", wait_ticks=2),
+        cmd("/player Steve look at 10.5 -59.5 0.5", wait_ticks=2),
+        cmd("/data get entity Steve Pos"),
+        cmd("/player Steve use", game_ticks=10),
+        cmd("/data get entity Steve Pos", tolerance=0.3),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/execute if entity @e[type=minecraft:ender_pearl]"),
+        cmd("/kill @e[type=minecraft:ender_pearl]"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_use_continuous():
+    """continuous use action throws every snowball in the stack."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(80),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/item replace entity Steve hotbar.0 with minecraft:snowball 3"),
+        cmd("/player Steve hotbar 1", wait_ticks=2),
+        cmd("/player Steve look up", wait_ticks=2),
+        cmd("/player Steve use continuous"),
+        wait_game_ticks(10),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/execute if entity @e[type=minecraft:snowball]"),
+        cmd("/player Steve stop", wait_ticks=2),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/execute if entity @e[type=minecraft:snowball]"),
+        cmd("/kill @e[type=minecraft:snowball]"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_portal():
+    """fake players travel through a nether portal."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(80),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 3.5 -60 0.5 0 0", wait_ticks=2),
+        cmd("/fill 3 -59 0 4 -57 0 minecraft:nether_portal[axis=x]"),
+        cmd("/data get entity Steve Dimension"),
+        wait_game_ticks(120),
+        cmd("/data get entity Steve Dimension"),
+        cmd("/data get entity Steve Pos", tolerance=0.5),
+        wait_game_ticks(40),
+        cmd("/data get entity Steve Dimension"),
+        cmd("/data get entity Steve Pos", tolerance=0.5),
+        cmd("/fill 3 -59 0 4 -57 0 minecraft:air"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
 CASES = {
     "smoke": ("vanilla sanity checks (world/blocks/entities/list)", case_smoke),
     "bot_basic": ("spawn bot, look/move/stop, read position/rotation", case_bot_basic),
@@ -1004,6 +1131,10 @@ CASES = {
     "bot_use_entity": ("use action on sheep (dye) and item frame", case_bot_use_entity),
     "bot_knockback": ("attack knockback, normal and sprinting", case_bot_knockback),
     "bot_dimensions": ("spawn fake players in nether and end", case_bot_dimensions),
+    "bot_mob_ai": ("zombie AI targets and attacks a fake player", case_bot_mob_ai),
+    "bot_ender_pearl": ("ender pearl teleport for fake players", case_bot_ender_pearl),
+    "bot_use_continuous": ("continuous use throws the whole snowball stack", case_bot_use_continuous),
+    "bot_portal": ("nether portal travel for fake players", case_bot_portal),
 }
 
 
@@ -1321,14 +1452,16 @@ def main(argv):
                     matched += 1
                     match = True
                     report.emit("      => MATCH")
-                elif args.tolerance > 0 and outputs_within_tolerance(
-                    normalized["ref"], normalized["sapling"], args.tolerance
-                ):
-                    matched += 1
-                    match = True
-                    report.emit("      => MATCH (within tolerance %g)" % args.tolerance)
                 else:
-                    differed += 1
+                    tolerance = step.tolerance if step.tolerance is not None else args.tolerance
+                    if tolerance > 0 and outputs_within_tolerance(
+                        normalized["ref"], normalized["sapling"], tolerance
+                    ):
+                        matched += 1
+                        match = True
+                        report.emit("      => MATCH (within tolerance %g)" % tolerance)
+                    else:
+                        differed += 1
                     match = False
                     report.emit("      => DIFF")
                     diff = difflib.unified_diff(

@@ -148,6 +148,7 @@ python3 tools/parity/parity.py --case bot_physics --tolerance 0.75
 python3 tools/parity/parity.py --case bot_basic --only ref      # single-server test
 python3 tools/parity/parity.py --commands my-case.txt --ticks 2 # your own sequence
 python3 tools/parity/parity.py --list-cases
+python3 tools/parity/check-status.py    # server-list ping player sample parity
 ```
 
 `run-suite.sh` stops both servers, resets their worlds, restarts them and runs
@@ -265,13 +266,23 @@ are normalised or worked around in the harness:
 | bot_use_entity | 30 | dye a sheep, fill an item frame |
 | bot_knockback | 28 | knockback vector, normal vs sprint attack |
 | bot_dimensions | 13 | spawn in the nether and the end |
+| bot_mob_ai | 20 | zombie AI targets/pushes/attacks a fake player |
+| bot_ender_pearl | 20 | ender pearl teleport for fake players |
+| bot_use_continuous | 21 | continuous use consumes the whole snowball stack |
+| bot_portal | 17 | nether portal travel |
 
-Total: ~455 RCON command comparisons, 0 differences.
+Total: ~533 RCON command comparisons, 0 differences.
+
+Server-list ping parity (`check-status.py`): with a fake player online both
+servers report `{"online": 1, "sample": ["Anonymous Player"]}` (Carpet's
+`allowListingFakePlayers=false` hides the name behind the anonymous sample
+entry while still counting the player); after the fake is killed both report an
+empty sample. The script waits 6 s because both servers cache the ping response
+for 5 s.
 
 Known remaining coverage gaps (not yet ported/tested): shadow (needs a real
-client), fake-player interaction with mob AI targeting, sleeping in beds,
-portal/dimension travel, server-ping player sample listing, and restart
-persistence behaviour.
+client), sleeping in beds, restart persistence behaviour, and non-console
+permission variants for the /player command.
 
 ## Troubleshooting
 
