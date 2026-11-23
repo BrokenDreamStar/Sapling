@@ -156,6 +156,7 @@ python3 tools/parity/check-config.py    # allowSpawningOfflinePlayers=false bran
 python3 tools/parity/check-listing.py   # allowListingFakePlayers=true ping-sample branch
 python3 tools/parity/check-permissions.py  # commandPlayer permission branch
 python3 tools/parity/check-shadow.py    # /player shadow with a real protocol client
+python3 tools/parity/check-client-permissions.py  # /player permission matrix from a real client
 ```
 
 `run-suite.sh` stops both servers, resets their worlds, restarts them and runs
@@ -301,6 +302,13 @@ Listing branch (`check-listing.py`): with `allowListingFakePlayers=true` the fak
 player's real name appears in the SLP sample on both servers (`["ListBot"]`);
 the default `false` behaviour (anonymous sample entry) is covered by
 `check-status.py`.
+
+Client permission matrix (`check-client-permissions.py`): a real (protocol)
+client at permission level 0 sends the unsigned command packet. With
+`commandPlayer=ops` (and `1`..`4`) the command is denied until the player is
+opped; with `false` it stays denied even for an op; with `0` every player may
+use it. Both servers behave identically (verified for the ops/false branches
+and the numeric levels).
 
 Permission branch (`check-permissions.py`): `commandPlayer=false` hides the whole
 `/player` command tree from the RCON console on both servers (identical

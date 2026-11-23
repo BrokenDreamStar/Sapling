@@ -76,6 +76,8 @@ def probe(script, rcon_port, game_port, name):
             client.wait_play(20)
             wait_until(rcon, "/list", name)
             result["list_before"] = parity.normalize(rcon.command("/list"))
+            # a fake player cannot take the name of the online real player
+            result["spawn_collision_reply"] = parity.normalize(rcon.command("/player " + name + " spawn"))
             result["shadow_reply"] = parity.normalize(rcon.command("/player " + name + " shadow"))
             client.wait_closed(8.0)
             result["client_disconnect"] = sorted(

@@ -21,7 +21,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Messenger {
-    public static final Logger LOG = LoggerFactory.getLogger("Sapling Messaging");
+    public static final Logger LOG = LoggerFactory.getLogger("Messaging System");
 
     private static final Pattern colorExtract = Pattern.compile("#([0-9a-fA-F]{6})");
 

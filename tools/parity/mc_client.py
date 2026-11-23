@@ -40,7 +40,7 @@ CONFIG_SB = {
     "accept_code_of_conduct": 9,
 }
 PLAY_CB = {"disconnect": 32, "login": 49, "keep_alive": 44, "ping": 61, "start_configuration": 118}
-PLAY_SB = {"keep_alive": 28, "client_information": 14, "pong": 45}
+PLAY_SB = {"keep_alive": 28, "client_information": 14, "chat_command": 7, "pong": 45}
 
 
 def offline_uuid(name):
@@ -95,6 +95,7 @@ class MinecraftClient:
         self.compression = -1
         self.state = "offline"
         self.play_event = threading.Event()
+        self.state_ready = threading.Event()
         self.closed_event = threading.Event()
         self.disconnect_info = None
         self.error = None
@@ -163,6 +164,11 @@ class MinecraftClient:
     def wait_closed(self, timeout=10.0):
         return self.closed_event.wait(timeout)
 
+    def send_chat_command(self, command):
+        """Send the unsigned command packet (as if typed in chat without '/')."""
+        self.state_ready.wait(10.0)
+        self._send_packet(PLAY_SB["chat_command"], write_string(command))
+
     def close(self):
         if self.sock is not None:
             try:
@@ -180,6 +186,7 @@ class MinecraftClient:
             self._configuration_loop()
             self.state = "play"
             self.play_event.set()
+            self.state_ready.set()
             self._play_loop()
         except Exception as exc:  # noqa: BLE001 - report any protocol problem
             self.error = repr(exc)
