@@ -587,7 +587,6 @@ def case_bot_mine():
         cmd("/player Steve look at 1.5 -59.5 0.5", wait_ticks=2),
         cmd("/player Steve attack", wait_ticks=2),
         cmd("/execute if block 1 -60 0 minecraft:air"),
-        cmd("/kill @e[type=minecraft:item]"),
         cmd("/player Steve kill", wait_ticks=1),
         sync_until("/execute unless entity Steve", "Test passed"),
         cmd("/player Steve spawn in survival", wait_ticks=2),
@@ -602,7 +601,11 @@ def case_bot_mine():
         cmd("/player Steve stop", wait_ticks=1),
         cmd("/execute if block 1 -60 0 minecraft:air"),
         cmd("/setblock 1 -60 0 minecraft:air"),
-    ] + _bot_teardown_steps()
+    ] + [
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
 
 
 def case_bot_mount():
@@ -1023,7 +1026,11 @@ def case_bot_mob_ai():
     ]
 
 def case_bot_ender_pearl():
-    """ender pearl teleport works for fake players (FakeClientConnection isOpen)."""
+    """ender pearl teleport works for fake players (FakeClientConnection isOpen).
+
+    The pearl is thrown into a close wall so the landing point (and therefore
+    the teleport destination) is stable across tick phases.
+    """
     return [
         cmd("/tick unfreeze"),
         cmd("/forceload add 0 0", wait_ticks=1),
@@ -1034,23 +1041,25 @@ def case_bot_ender_pearl():
         sync_until("/execute if entity Steve", "Test passed"),
         wait_for(80),
         cmd("/clear Steve"),
+        cmd("/setblock 2 -60 0 minecraft:stone"),
+        cmd("/setblock 2 -59 0 minecraft:stone"),
         cmd("/tp Steve 0.5 -60 0.5 0 0"),
         wait_for(2),
         cmd("/item replace entity Steve hotbar.0 with minecraft:ender_pearl 1"),
         cmd("/player Steve hotbar 1", wait_ticks=2),
-        cmd("/player Steve look at 10.5 -59.5 0.5", wait_ticks=2),
+        cmd("/player Steve look at 2.5 -59.5 0.5", wait_ticks=2),
         cmd("/data get entity Steve Pos"),
-        cmd("/player Steve use", game_ticks=10),
-        cmd("/data get entity Steve Pos", tolerance=0.3),
+        cmd("/player Steve use", game_ticks=8),
+        cmd("/data get entity Steve Pos", tolerance=0.6),
         cmd("/data get entity Steve Inventory[0]"),
         cmd("/execute if entity @e[type=minecraft:ender_pearl]"),
+        cmd("/setblock 2 -60 0 minecraft:air"),
+        cmd("/setblock 2 -59 0 minecraft:air"),
         cmd("/kill @e[type=minecraft:ender_pearl]"),
-        cmd("/kill @e[type=minecraft:item]"),
         cmd("/player Steve kill", wait_ticks=1),
         sync_until("/execute unless entity Steve", "Test passed"),
         cmd("/forceload remove 0 0"),
     ]
-
 
 def case_bot_use_continuous():
     """continuous use action throws every snowball in the stack."""

@@ -149,6 +149,7 @@ python3 tools/parity/parity.py --case bot_basic --only ref      # single-server 
 python3 tools/parity/parity.py --commands my-case.txt --ticks 2 # your own sequence
 python3 tools/parity/parity.py --list-cases
 python3 tools/parity/check-status.py    # server-list ping player sample parity
+python3 tools/parity/check-restart.py   # fake players are not persisted across restarts
 ```
 
 `run-suite.sh` stops both servers, resets their worlds, restarts them and runs
@@ -253,7 +254,7 @@ are normalised or worked around in the harness:
 | bot_attack | 30 | attack a NoAI zombie, damage and knockback |
 | bot_inventory | 57 | hotbar/swapHands/drop/dropStack, per-slot NBT |
 | bot_use | 34 | use on lever block, use snowball item |
-| bot_mine | 30 | creative instant break, survival hand mining |
+| bot_mine | 27 | creative instant break, survival hand mining |
 | bot_mount | 23 | mount/dismount boat, position while riding |
 | bot_cmd_errors | 30 | command tree/argument error parity |
 | bot_spawn | 27 | spawn argument matrix (pos/facing/dim/gamemode/spectator) |
@@ -267,11 +268,15 @@ are normalised or worked around in the harness:
 | bot_knockback | 28 | knockback vector, normal vs sprint attack |
 | bot_dimensions | 13 | spawn in the nether and the end |
 | bot_mob_ai | 20 | zombie AI targets/pushes/attacks a fake player |
-| bot_ender_pearl | 20 | ender pearl teleport for fake players |
+| bot_ender_pearl | 23 | ender pearl teleport for fake players |
 | bot_use_continuous | 21 | continuous use consumes the whole snowball stack |
 | bot_portal | 17 | nether portal travel |
 
-Total: ~533 RCON command comparisons, 0 differences.
+Total: ~535 RCON command comparisons, 0 differences.
+
+Restart persistence (`check-restart.py`): after spawning a fake player and
+restarting both servers, neither restores the fake (Carpet semantics: fake
+players are not saved) — both report an empty player list.
 
 Server-list ping parity (`check-status.py`): with a fake player online both
 servers report `{"online": 1, "sample": ["Anonymous Player"]}` (Carpet's
@@ -281,8 +286,8 @@ empty sample. The script waits 6 s because both servers cache the ping response
 for 5 s.
 
 Known remaining coverage gaps (not yet ported/tested): shadow (needs a real
-client), sleeping in beds, restart persistence behaviour, and non-console
-permission variants for the /player command.
+client), sleeping in beds, and non-console permission variants for the /player
+command.
 
 ## Troubleshooting
 
