@@ -126,7 +126,7 @@ public final class LeavesConfig {
     // Sapling - carpet fake player settings (semantics identical to Carpet's CarpetSettings)
     @GlobalConfigCategory("fakeplayer")
     public static class FakeplayerSettings {
-        @GlobalConfig(value = "command-player")
+        @GlobalConfig(value = "command-player", validator = org.leavesmc.leaves.bot.CommandPlayerConfigValidator.class)
         public String commandPlayer = "ops";
 
         @GlobalConfig("allow-spawning-offline-players")

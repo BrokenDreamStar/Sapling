@@ -155,6 +155,7 @@ python3 tools/parity/check-data.py      # on-disk stats/advancements parity
 python3 tools/parity/check-config.py    # allowSpawningOfflinePlayers=false branch (online mode)
 python3 tools/parity/check-listing.py   # allowListingFakePlayers=true ping-sample branch
 python3 tools/parity/check-permissions.py  # commandPlayer permission branch
+python3 tools/parity/check-shadow.py    # /player shadow with a real protocol client
 ```
 
 `run-suite.sh` stops both servers, resets their worlds, restarts them and runs
@@ -290,6 +291,12 @@ same advancement entries (recipe unlocks, adventuring_time); only the offline
 UUID file name (vanilla vs CraftBukkit offline-uuid layout), time counters and
 the top-level DataVersion are normalised.
 
+Shadow (`check-shadow.py` + `mc_client.py`): a minimal protocol-775 client
+(handshake -> login -> configuration -> play, compression/keep-alive aware)
+logs in as a real player; `/player <name> shadow` must disconnect it with
+`multiplayer.disconnect.duplicate_login` and leave a controllable fake player
+with the same name/position/health, which can then be moved and killed.
+
 Listing branch (`check-listing.py`): with `allowListingFakePlayers=true` the fake
 player's real name appears in the SLP sample on both servers (`["ListBot"]`);
 the default `false` behaviour (anonymous sample entry) is covered by
@@ -323,8 +330,10 @@ entry while still counting the player); after the fake is killed both report an
 empty sample. The script waits 6 s because both servers cache the ping response
 for 5 s.
 
-Known remaining coverage gaps (not yet ported/tested): shadow (needs a real
-client) and non-console permission variants for the /player command.
+Notes on the config schema: `fakeplayer.command-player` accepts the carpet forms
+`ops`, `true`/`false` and `0`..`4`; unquoted YAML booleans/numbers are normalised by
+`CommandPlayerConfigValidator` so `command-player: false` behaves like carpet
+instead of silently falling back to the default.
 
 ## Troubleshooting
 

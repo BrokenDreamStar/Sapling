@@ -219,7 +219,7 @@ index 3fabf25ed5d8b46aa05a99a4075a74b630793e00..ce144dcb817632e6f9c7e27a24b1cbc3
                  }
                  // Leaves end - skip
 diff --git a/net/minecraft/server/level/ServerPlayer.java b/net/minecraft/server/level/ServerPlayer.java
-index df6fff8eab018b1245c8aee6a5df279bde585197..ad36cc6a41c8d3f5a67a32e46718f2430f6c6b90 100644
+index df6fff8eab018b1245c8aee6a5df279bde585197..522c662bc023548b54304731cf7bad5379ded708 100644
 --- a/net/minecraft/server/level/ServerPlayer.java
 +++ b/net/minecraft/server/level/ServerPlayer.java
 @@ -203,6 +203,7 @@ import org.jspecify.annotations.Nullable;
@@ -246,7 +246,23 @@ index df6fff8eab018b1245c8aee6a5df279bde585197..ad36cc6a41c8d3f5a67a32e46718f243
          // CraftBukkit start
          if (this.joining) {
              this.joining = false;
-@@ -1598,11 +1601,6 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+@@ -1311,10 +1314,11 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
+         }
+ 
+         // Leaves start - spawn invulnerable time
+-        if (org.leavesmc.leaves.LeavesConfig.modify.oldMC.spawnInvulnerableTime) {
+-            if (this.spawnInvulnerableTime > 0 && !source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+-                return false;
+-            }
++        // Sapling - carpet fake players inherit vanilla 26.1 spawn invulnerability
++        // (60 ticks) even when the Leaves oldMC toggle is disabled.
++        if ((org.leavesmc.leaves.LeavesConfig.modify.oldMC.spawnInvulnerableTime || this instanceof org.leavesmc.leaves.bot.FakePlayer)
++            && this.spawnInvulnerableTime > 0 && !source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
++            return false;
+         }
+         // Leaves end - spawn invulnerable time
+ 
+@@ -1598,11 +1602,6 @@ public class ServerPlayer extends Player implements ca.spottedleaf.moonrise.patc
          this.lastSentHealth = -1.0F;
          this.lastSentFood = -1;
          this.teleportSpectators(transition, oldLevel);
@@ -276,7 +292,7 @@ index 437c3bf4ee59801e2b04ea2b0a78a6dd83e49d66..ce26768b951a5cd3e3337ef5347ce153
          boolean stateLocked = true; try { this.stateLock.lock(); // Paper - Fix GameProfileCache concurrency
          CachedUserNameToIdResolver.GameProfileInfo profileInfo = this.profilesByName.get(userName);
 diff --git a/net/minecraft/server/players/PlayerList.java b/net/minecraft/server/players/PlayerList.java
-index 70e4824f23af05c3974bcd4706badde4f550e9b6..7645ba6afc77da5887198ac30a1f71e43de079ad 100644
+index 70e4824f23af05c3974bcd4706badde4f550e9b6..c09d73b2f0a987e03020918fe50812fb4aecb86f 100644
 --- a/net/minecraft/server/players/PlayerList.java
 +++ b/net/minecraft/server/players/PlayerList.java
 @@ -212,18 +212,6 @@ public abstract class PlayerList {
@@ -347,6 +363,15 @@ index 70e4824f23af05c3974bcd4706badde4f550e9b6..7645ba6afc77da5887198ac30a1f71e4
  
          final net.kyori.adventure.text.Component jm = playerJoinEvent.joinMessage();
  
+@@ -683,7 +664,7 @@ public abstract class PlayerList {
+         player.getAdvancements().stopListening();
+         this.players.remove(player);
+         this.realPlayers.remove(player); // Leaves - replay api
+-        this.playersByName.remove(player.getScoreboardName().toLowerCase(java.util.Locale.ROOT)); // Spigot
++        this.playersByName.remove(player.getScoreboardName().toLowerCase(java.util.Locale.ROOT), player); // Sapling - a shadow player replaces the disconnecting one with the same name
+         this.server.getCustomBossEvents().onPlayerDisconnect(player);
+         UUID uuid = player.getUUID();
+         ServerPlayer serverPlayer = this.playersByUUID.get(uuid);
 @@ -901,11 +882,6 @@ public abstract class PlayerList {
              respawnReason
          ).callEvent();

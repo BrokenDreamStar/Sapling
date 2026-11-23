@@ -73,7 +73,9 @@ def main():
     run("run-sapling.sh", "--stop")
 
     # phase 1: commandPlayer = false (command tree should be denied)
-    set_sapling_command_player("'false'")
+    # unquoted false is a YAML boolean; the CommandPlayerConfigValidator must
+    # normalise it to the carpet string value "false"
+    set_sapling_command_player("false")
     run("run-carpet.sh", "--reset-world", "--wait-ready")
     run("run-sapling.sh", "--reset-world", "--wait-ready")
     with parity.Rcon("127.0.0.1", CARPET_RCON, "parity") as rcon:
