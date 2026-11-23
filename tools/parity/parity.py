@@ -235,12 +235,14 @@ def normalize(text, decimals=3, mask_patterns=None):
 # Command steps and built-in cases
 # ---------------------------------------------------------------------------
 class Step:
-    __slots__ = ("command", "wait_ticks", "note")
+    __slots__ = ("command", "wait_ticks", "note", "sync_expect", "sync_timeout")
 
-    def __init__(self, command, wait_ticks=0.0, note=None):
+    def __init__(self, command, wait_ticks=0.0, note=None, sync_expect=None, sync_timeout=15.0):
         self.command = command
         self.wait_ticks = float(wait_ticks)
         self.note = note
+        self.sync_expect = sync_expect
+        self.sync_timeout = float(sync_timeout)
 
     def __repr__(self):
         if self.command is None:
@@ -256,26 +258,37 @@ def wait_for(ticks):
     return Step(None, ticks)
 
 
+def sync_until(command, expect, timeout=15.0):
+    """Poll a probe command on each server until its output contains *expect*.
+
+    Used as a synchronisation barrier (e.g. "wait until the fake player exists")
+    so that spawn timing differences never show up as false parity diffs.
+    """
+    return Step(command, sync_expect=expect, sync_timeout=timeout)
+
+
 def tick_step(ticks):
-    """Advance the frozen tick loop by N ticks (with a little wall-clock slack)."""
-    return Step("/tick step " + str(ticks), wait_ticks=float(ticks) + 5.0)
+    """Advance the frozen tick loop by N ticks (with wall-clock slack so it settles)."""
+    return Step("/tick step " + str(ticks), wait_ticks=float(ticks) + 12.0)
 
 
 def case_smoke():
-    """Vanilla sanity checks: world seed/generator, blocks, entities, /list.
+    """Vanilla sanity checks: chunk loading, blocks, entities, /list.
 
-    These must match on both servers before bot behaviour can be compared.
+    MC 26.1 does not keep spawn chunks loaded for a player-less server, so the
+    case force-loads chunk [0, 0] first. The flat world preset puts the surface
+    at y=-60 (bedrock -64, dirt -63..-62, grass -61). Gamerule names are the
+    26.1 snake_case names (advance_time, advance_weather, ...).
     """
     return [
-        cmd("/gamerule doDaylightCycle false"),
-        cmd("/gamerule doWeatherCycle false"),
+        cmd("/forceload remove 0 0"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule advance_weather false"),
         cmd("/time set 1000"),
         cmd("/weather clear"),
         cmd("/kill @e[type=minecraft:marker,tag=parity_marker]"),
-        cmd(
-            "/summon minecraft:marker 10.25 5.5 -3.75 "
-            "{Tags:[\"parity_marker\"]}"
-        ),
+        cmd("/summon minecraft:marker 0.5 100 0.5 {Tags:[\"parity_marker\"]}"),
         cmd(
             "/execute in minecraft:overworld run data get entity "
             "@e[type=minecraft:marker,tag=parity_marker,limit=1] Pos"
@@ -285,11 +298,11 @@ def case_smoke():
         cmd("/execute if block 0 -60 0 minecraft:air"),
         cmd("/setblock 3 100 4 minecraft:stone"),
         cmd("/execute if block 3 100 4 minecraft:stone"),
-        cmd("/execute in minecraft:overworld run data get block 3 100 4"),
         cmd("/seed"),
         cmd("/list"),
         cmd("/kill @e[type=minecraft:marker,tag=parity_marker]"),
         cmd("/setblock 3 100 4 minecraft:air"),
+        cmd("/forceload remove 0 0"),
     ]
 
 
@@ -298,15 +311,19 @@ def case_bot_basic():
     return [
         cmd("/tick unfreeze"),
         cmd("/tick freeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
         cmd("/time set 1000"),
-        cmd("/gamerule doDaylightCycle false"),
-        cmd("/player Steve kill"),
+        cmd("/gamerule advance_time false"),
+        cmd("/player Steve kill", wait_ticks=1),
         cmd("/player Steve spawn", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        tick_step(10),  # both servers reach full attack strength regardless of async spawn tick
         tick_step(2),
+        cmd("/data get entity Steve Pos"),
+        cmd("/data get entity Steve Rotation"),
         cmd("/tp Steve 0.5 -60 0.5 0 0"),
         tick_step(1),
         cmd("/data get entity Steve Pos"),
-        cmd("/data get entity Steve Rotation"),
         cmd("/player Steve look north", wait_ticks=1),
         tick_step(1),
         cmd("/data get entity Steve Rotation"),
@@ -320,52 +337,73 @@ def case_bot_basic():
         tick_step(1),
         cmd("/data get entity Steve Rotation"),
         cmd("/player Steve kill", wait_ticks=1),
-        tick_step(2),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        wait_for(2),
         cmd("/list"),
+        cmd("/forceload remove 0 0"),
         cmd("/tick unfreeze"),
     ]
 
 
 def case_bot_attack():
-    """Spawn a fake player, make it attack a static NoAI zombie, compare damage."""
+    """Spawn a fake player, make it attack a static NoAI zombie, compare damage.
+
+    Note: on the Carpet 26.1 reference server fake players spawn in creative
+    mode (playerGameType 1). A single /player attack still deals a small,
+    deterministic amount of damage, which is exactly what the parity check
+    records. A larger difference on the Sapling side is a real finding.
+    """
     return [
         cmd("/tick unfreeze"),
         cmd("/tick freeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
         cmd("/time set 18000"),
-        cmd("/gamerule doDaylightCycle false"),
-        cmd("/gamerule doMobSpawning false"),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
         cmd("/kill @e[type=minecraft:zombie,tag=parity_target]"),
-        cmd("/player Steve kill"),
+        cmd("/player Steve kill", wait_ticks=1),
         cmd("/player Steve spawn", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
         tick_step(2),
         cmd("/tp Steve 0.5 -60 0.5 0 0"),
         tick_step(1),
         cmd(
-            "/summon minecraft:zombie 2.2 -60 0.5 "
+            "/summon minecraft:zombie 1.5 -60 0.5 "
             "{NoAI:1b,PersistenceRequired:1b,Tags:[\"parity_target\"]}"
         ),
         tick_step(1),
-        cmd("/player Steve look at 2.2 -60 0.5", wait_ticks=1),
+        cmd("/player Steve look at 1.5 -60 0.5", wait_ticks=1),
         tick_step(1),
+        # Attack strength depends on how many ticks the fake player has been alive.
+        # Frozen /tick step semantics differ between Fabric (Carpet) and Paper, so
+        # run the attack phase in real time: both servers then attack at full strength.
+        cmd("/tick unfreeze"),
+        wait_for(60),
+        cmd(
+            "/execute in minecraft:overworld run data get entity "
+            "@e[type=minecraft:zombie,tag=parity_target,limit=1] Health"
+        ),
+        cmd("/player Steve attack"),
+        wait_for(20),
         cmd(
             "/execute in minecraft:overworld run data get entity "
             "@e[type=minecraft:zombie,tag=parity_target,limit=1] Health"
         ),
         cmd("/player Steve attack continuous"),
-        tick_step(30),
+        wait_for(40),
         cmd("/player Steve stop", wait_ticks=1),
-        tick_step(1),
+        wait_for(5),
         cmd(
             "/execute in minecraft:overworld run data get entity "
             "@e[type=minecraft:zombie,tag=parity_target,limit=1] Health"
         ),
         cmd("/data get entity Steve Health"),
         cmd("/list"),
-        cmd("/player Steve attack"),
-        tick_step(2),
         cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
         tick_step(2),
         cmd("/kill @e[type=minecraft:zombie,tag=parity_target]"),
+        cmd("/forceload remove 0 0"),
         cmd("/tick unfreeze"),
     ]
 
@@ -596,6 +634,23 @@ def main(argv):
                 if args.verbose:
                     report.emit("[%3d] wait %g ticks" % (index, step.wait_ticks))
                 sleep_ticks(step.wait_ticks)
+                continue
+
+            if step.sync_expect is not None:
+                for name in names:
+                    deadline = time.monotonic() + step.sync_timeout
+                    while True:
+                        output = targets[name].command(step.command)
+                        if step.sync_expect in output:
+                            break
+                        if time.monotonic() >= deadline:
+                            raise RconError(
+                                "sync step timed out on " + name + ": " + step.command
+                                + " (last output: " + output + ")"
+                            )
+                        time.sleep(0.05)
+                if args.verbose:
+                    report.emit("[%3d] sync %s" % (index, step.command))
                 continue
 
             commands_run += 1

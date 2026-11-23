@@ -59,3 +59,5 @@ run
 !gradle/wrapper/gradle-wrapper.jar
 !scripts/*.sh
 **/build/
+__pycache__/
+*.pyc
