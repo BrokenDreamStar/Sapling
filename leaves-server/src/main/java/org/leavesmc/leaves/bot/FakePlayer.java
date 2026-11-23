@@ -3,7 +3,6 @@
 package org.leavesmc.leaves.bot;
 
 import com.mojang.authlib.GameProfile;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.chat.Component;
@@ -34,7 +33,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ResolvableProfile;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.level.storage.TagValueInput;
 import net.minecraft.world.level.storage.ValueInput;
@@ -265,11 +263,6 @@ public class FakePlayer extends ServerPlayer
     @Override
     public boolean allowsListing() {
         return BotSettings.allowListingFakePlayers();
-    }
-
-    @Override
-    protected void checkFallDamage(double y, boolean onGround, BlockState state, BlockPos pos) {
-        doCheckFallDamage(0.0, y, 0.0, onGround);
     }
 
     @Override
