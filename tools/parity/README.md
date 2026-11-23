@@ -153,6 +153,8 @@ python3 tools/parity/check-restart.py   # fake players are not persisted across 
 python3 tools/parity/check-log.py       # join/leave/death console log messages
 python3 tools/parity/check-data.py      # on-disk stats/advancements parity
 python3 tools/parity/check-config.py    # allowSpawningOfflinePlayers=false branch (online mode)
+python3 tools/parity/check-listing.py   # allowListingFakePlayers=true ping-sample branch
+python3 tools/parity/check-permissions.py  # commandPlayer permission branch
 ```
 
 `run-suite.sh` stops both servers, resets their worlds, restarts them and runs
@@ -287,6 +289,16 @@ deterministic statistics sections (`mined`, `picked_up`, `used`, ...) and the
 same advancement entries (recipe unlocks, adventuring_time); only the offline
 UUID file name (vanilla vs CraftBukkit offline-uuid layout), time counters and
 the top-level DataVersion are normalised.
+
+Listing branch (`check-listing.py`): with `allowListingFakePlayers=true` the fake
+player's real name appears in the SLP sample on both servers (`["ListBot"]`);
+the default `false` behaviour (anonymous sample entry) is covered by
+`check-status.py`.
+
+Permission branch (`check-permissions.py`): `commandPlayer=false` hides the whole
+`/player` command tree from the RCON console on both servers (identical
+"Unknown or incomplete command"), while `commandPlayer=4` allows console use and
+the fake player spawns asynchronously on both.
 
 Config branch (`check-config.py`): `allowSpawningOfflinePlayers` only matters
 in online mode, so both servers are started with `PARITY_ONLINE_MODE=true` and
