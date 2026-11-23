@@ -140,7 +140,7 @@ tools/parity/run-sapling.sh --stop
 ## 4. Run parity checks
 
 ```
-tools/parity/run-suite.sh                # all 18 cases, fresh world per case
+tools/parity/run-suite.sh                # all 26 cases, fresh world per case
 tools/parity/run-suite.sh bot_physics    # selected cases only
 python3 tools/parity/parity.py --case smoke        # 19 vanilla sanity commands
 python3 tools/parity/parity.py --case bot_basic    # spawn/look/move/stop/kill
@@ -250,6 +250,12 @@ are normalised or worked around in the harness:
   players behave like Carpet's.
 
 ## Validation performed (2026-11-24, real servers, real RCON)
+
+Final verification on the committed code (2026-11-24): all 26 cases matched
+(632 comparisons, `SUITE_EXIT:0`) and all nine standalone checks
+(status / restart persistence / console log / player data / listing /
+console permissions / client permissions / shadow / config branch) reported
+MATCH. Transcript: `.carpet-ref/final-verify.log` (git-excluded).
 
 `run-suite.sh` was run repeatedly against freshly reset worlds; current status
 (all cases matched, 0 differed):
