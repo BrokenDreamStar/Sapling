@@ -25,7 +25,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.leavesmc.leaves.LeavesConfig;
 import org.leavesmc.leaves.LeavesLogger;
-import org.leavesmc.leaves.bot.ServerBot;
+import org.leavesmc.leaves.bot.FakePlayer;
 import org.leavesmc.leaves.plugin.MinecraftInternalPlugin;
 import org.leavesmc.leaves.protocol.core.LeavesCustomPayload;
 import org.leavesmc.leaves.protocol.core.LeavesProtocol;
@@ -137,17 +137,17 @@ public class PcaSyncProtocol implements LeavesProtocol {
                             return;
                         }
                         case BOT -> {
-                            if (!(entity instanceof ServerBot)) {
+                            if (!(entity instanceof FakePlayer)) {
                                 return;
                             }
                         }
                         case OPS -> {
-                            if (!(entity instanceof ServerBot) && !server.getPlayerList().isOp(player.nameAndId())) {
+                            if (!(entity instanceof FakePlayer) && !server.getPlayerList().isOp(player.nameAndId())) {
                                 return;
                             }
                         }
                         case OPS_AND_SELF -> {
-                            if (!(entity instanceof ServerBot) && !server.getPlayerList().isOp(player.nameAndId()) && entity != player) {
+                            if (!(entity instanceof FakePlayer) && !server.getPlayerList().isOp(player.nameAndId()) && entity != player) {
                                 return;
                             }
                         }

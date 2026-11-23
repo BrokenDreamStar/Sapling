@@ -13,9 +13,6 @@ import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.plugin.PluginManager;
 import org.jetbrains.annotations.NotNull;
-import org.leavesmc.leaves.bot.BotList;
-import org.leavesmc.leaves.bot.ServerBot;
-import org.leavesmc.leaves.command.bot.BotCommand;
 import org.leavesmc.leaves.command.leaves.LeavesCommand;
 import org.leavesmc.leaves.config.GlobalConfigManager;
 import org.leavesmc.leaves.config.annotations.GlobalConfig;
@@ -124,151 +121,23 @@ public final class LeavesConfig {
 
     public static ModifyConfig modify = new ModifyConfig();
 
+    public static FakeplayerSettings fakeplayer = new FakeplayerSettings();
+
+    // Sapling - carpet fake player settings (semantics identical to Carpet's CarpetSettings)
+    @GlobalConfigCategory("fakeplayer")
+    public static class FakeplayerSettings {
+        @GlobalConfig(value = "command-player")
+        public String commandPlayer = "ops";
+
+        @GlobalConfig("allow-spawning-offline-players")
+        public boolean allowSpawningOfflinePlayers = true;
+
+        @GlobalConfig("allow-listing-fake-players")
+        public boolean allowListingFakePlayers = false;
+    }
+
     @GlobalConfigCategory("modify")
     public static class ModifyConfig {
-
-        public FakeplayerConfig fakeplayer = new FakeplayerConfig();
-
-        @GlobalConfigCategory("fakeplayer")
-        public static class FakeplayerConfig {
-
-            @TransferConfig("fakeplayer.enable")
-            @GlobalConfig(value = "enable", validator = FakeplayerValidator.class)
-            public boolean enable = true;
-
-            private static class FakeplayerValidator extends BooleanConfigValidator {
-                @Override
-                public void verify(Boolean old, Boolean value) throws IllegalArgumentException {
-                    if (!value.equals(old)) {
-                        if (value) {
-                            BotCommand.INSTANCE.register();
-                        } else {
-                            BotCommand.INSTANCE.unregister();
-                            BotList.INSTANCE.removeAll();
-                        }
-                    }
-                }
-            }
-
-            @TransferConfig("fakeplayer.unable-fakeplayer-names")
-            @GlobalConfig(value = "unable-fakeplayer-names")
-            public List<String> unableNames = List.of("player-name");
-
-            @GlobalConfig(value = "limit")
-            public int limit = 10;
-
-            @GlobalConfig(value = "prefix")
-            public String prefix = "";
-
-            @GlobalConfig(value = "suffix")
-            public String suffix = "";
-
-            @GlobalConfig(value = "regen-amount", validator = RegenAmountValidator.class)
-            public double regenAmount = 0.0;
-
-            private static class RegenAmountValidator extends DoubleConfigValidator {
-                @Override
-                public void verify(Double old, Double value) throws IllegalArgumentException {
-                    if (value < 0.0) {
-                        throw new IllegalArgumentException("regen-amount need >= 0.0");
-                    }
-                }
-            }
-
-            @GlobalConfig("resident-fakeplayer")
-            public boolean canResident = false;
-
-            @GlobalConfig("open-fakeplayer-inventory")
-            public boolean canOpenInventory = false;
-
-            @GlobalConfig(value = "use-action", validator = CanUseConfigValidator.class)
-            public boolean canUseAction = true;
-
-            private static class CanUseConfigValidator extends BotSubcommandValidator {
-                private CanUseConfigValidator() {
-                    super("use");
-                }
-            }
-
-            @GlobalConfig(value = "modify-config", validator = CanModifyConfigValidator.class)
-            public boolean canModifyConfig = false;
-
-            private static class CanModifyConfigValidator extends BotSubcommandValidator {
-                private CanModifyConfigValidator() {
-                    super("config");
-                }
-            }
-
-            @GlobalConfig(value = "manual-save-and-load", validator = CanManualSaveAndLoadValidator.class)
-            public boolean canManualSaveAndLoad = false;
-
-            private static class CanManualSaveAndLoadValidator extends BotSubcommandValidator {
-                private CanManualSaveAndLoadValidator() {
-                    super("save", "load");
-                }
-            }
-
-            private static class BotSubcommandValidator extends BooleanConfigValidator {
-                private final List<String> subcommands;
-
-                private BotSubcommandValidator(String... subcommand) {
-                    this.subcommands = List.of(subcommand);
-                }
-
-                @Override
-                public void verify(Boolean old, Boolean value) throws IllegalArgumentException {
-                    if (old != null && !old.equals(value)) {
-                        Bukkit.getOnlinePlayers().stream()
-                            .filter(sender -> subcommands.stream().allMatch(subcommand -> BotCommand.hasPermission(sender, subcommand)))
-                            .forEach(org.bukkit.entity.Player::updateCommands);
-                    }
-                }
-            }
-
-            @GlobalConfig(value = "cache-skin", lock = true)
-            public boolean useSkinCache = false;
-
-            public InGameConfig inGame = new InGameConfig();
-
-            @GlobalConfigCategory("in-game")
-            public static class InGameConfig {
-
-                @TransferConfig("modify.fakeplayer.always-send-data")
-                @GlobalConfig("always-send-data")
-                public boolean canSendDataAlways = true;
-
-                @TransferConfig("modify.fakeplayer.skip-sleep-check")
-                @GlobalConfig("skip-sleep-check")
-                public boolean canSkipSleep = false;
-
-                @TransferConfig("modify.fakeplayer.spawn-phantom")
-                @GlobalConfig("spawn-phantom")
-                public boolean canSpawnPhantom = false;
-
-                @TransferConfig("modify.fakeplayer.tick-type")
-                @GlobalConfig("tick-type")
-                public ServerBot.TickType tickType = ServerBot.TickType.NETWORK;
-
-                @GlobalConfig(value = "simulation-distance", validator = BotSimulationDistanceValidator.class)
-                private int simulationDistance = -1;
-
-                public int getSimulationDistance(ServerBot bot) {
-                    return this.simulationDistance == -1 ? bot.getBukkitEntity().getSimulationDistance() : this.simulationDistance;
-                }
-
-                public static class BotSimulationDistanceValidator extends IntConfigValidator {
-                    @Override
-                    public void verify(Integer old, Integer value) throws IllegalArgumentException {
-                        if ((value < 2 && value != -1) || value > 32) {
-                            throw new IllegalArgumentException("simulation-distance must be a number between 2 and 32, got: " + value);
-                        }
-                    }
-                }
-
-                @GlobalConfig("enable-locator-bar")
-                public boolean enableLocatorBar = false;
-            }
-        }
 
         public MinecraftOLDConfig oldMC = new MinecraftOLDConfig();
 

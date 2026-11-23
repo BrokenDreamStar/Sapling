@@ -13,7 +13,7 @@ import org.bukkit.Location;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.jetbrains.annotations.NotNull;
 import org.leavesmc.leaves.LeavesLogger;
-import org.leavesmc.leaves.bot.BotStatsCounter;
+import org.leavesmc.leaves.replay.PhotographerStatsCounter;
 import org.leavesmc.leaves.entity.photographer.CraftPhotographer;
 import org.leavesmc.leaves.entity.photographer.Photographer;
 
@@ -42,7 +42,7 @@ public class ServerPhotographer extends ServerPlayer {
         super(server, world, profile, ClientInformation.createDefault());
         this.gameMode = new ServerPhotographerGameMode(this);
         this.followPlayer = null;
-        this.stats = new BotStatsCounter(server);
+        this.stats = new PhotographerStatsCounter(server);
         this.lastPosVec3 = this.position();
     }
 

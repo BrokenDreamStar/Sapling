@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: BrokenDream_Star <shuqiwang179@gmail.com>
+Date: Tue, 24 Nov 2026 00:04:24 +0800
+Subject: [PATCH] Sapling: port carpet fake players, remove Leaves bot
+
+
+diff --git a/src/main/java/org/bukkit/Bukkit.java b/src/main/java/org/bukkit/Bukkit.java
+index 84e263084d4e62dc30e118b2e812047599965ece..f19261d58fd2b1adfd10e5ee008b44b723245bf7 100644
+--- a/src/main/java/org/bukkit/Bukkit.java
++++ b/src/main/java/org/bukkit/Bukkit.java
+@@ -3013,17 +3013,6 @@ public final class Bukkit {
+     }
+     // Leaves end - Feature API
+ 
+-    // Leaves start - Bot API
+-    /**
+-     * Returns a bot manager.
+-     *
+-     * @return Bot Manager
+-     */
+-    public static @NotNull org.leavesmc.leaves.entity.bot.BotManager getBotManager() {
+-        return server.getBotManager();
+-    }
+-    // Leaves end - Bot API
+-
+     // Leaves start - Photographer API
+     public static @NotNull org.leavesmc.leaves.entity.photographer.PhotographerManager getPhotographerManager() {
+         return server.getPhotographerManager();
+diff --git a/src/main/java/org/bukkit/Server.java b/src/main/java/org/bukkit/Server.java
+index 81c2c8339389f3b50b99b32ba765035e8cf1c28f..a68fd682250996d4ed98296ac1352614d464f934 100644
+--- a/src/main/java/org/bukkit/Server.java
++++ b/src/main/java/org/bukkit/Server.java
+@@ -2785,15 +2785,6 @@ public interface Server extends PluginMessageRecipient, net.kyori.adventure.audi
+     org.leavesmc.leaves.plugin.FeatureManager getFeatureManager();
+     // Leaves End - Feature API
+ 
+-    // Leaves start - Bot API
+-    /**
+-     * Returns a bot manager.
+-     *
+-     * @return Bot Manager
+-     */
+-    @NotNull org.leavesmc.leaves.entity.bot.BotManager getBotManager();
+-    // Leaves end - Bot API
+-
+     @NotNull org.leavesmc.leaves.entity.photographer.PhotographerManager getPhotographerManager(); // Leaves - Photographer API
+ 
+     org.leavesmc.leaves.bytebuf.BytebufAllocator getBytebufAllocator(); // Leaves - Bytebuf API
