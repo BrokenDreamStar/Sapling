@@ -214,7 +214,56 @@ def format_decimal(token, decimals):
     return text
 
 
-def normalize(text, decimals=3, mask_patterns=None):
+HERE_RE = re.compile(r"<--\[HERE\]")
+
+
+def _strip_error_context(text, command):
+    """Drop the Brigadier context snippet from syntax-error output.
+
+    Vanilla (Fabric/Carpet) appends the context to the message without a
+    separator, Paper emits it as a separate line; the snippet is always a
+    substring of the executed command, so strip suffixes that occur in it.
+    """
+    if not command or "<--[HERE]" not in text:
+        return text
+    needle = command[1:] if command.startswith("/") else command
+    kept = []
+    for line in text.split("\n"):
+        if "<--[HERE]" not in line:
+            kept.append(line)
+            continue
+        before = line.split("<--[HERE]")[0]
+        stripped = before
+        for size in range(len(before), 2, -1):
+            candidate = before[-size:]
+            if candidate in needle:
+                stripped = before[:-size]
+                break
+        if stripped.endswith("..."):
+            stripped = stripped[:-3]
+        stripped = stripped.rstrip()
+        if stripped:
+            kept.append(stripped)
+    return "\n".join(kept)
+
+
+COMPOUND_RE = re.compile(r"\{([^{}]*)\}")
+
+
+def _canonical_compound(match):
+    """Order-insensitive rendering of a flat NBT compound.
+
+    Paper and vanilla print compound tags in different key order; the data is
+    identical, so sort the fields before diffing.
+    """
+    inner = match.group(1)
+    parts = [part.strip() for part in inner.split(",")]
+    if not parts or any(":" not in part for part in parts):
+        return match.group(0)
+    return "{" + ", ".join(sorted(parts)) + "}"
+
+
+def normalize(text, decimals=3, mask_patterns=None, command=None):
     """Normalise command output so that only behavioural differences remain."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = COLOR_RE.sub("", text)
@@ -225,6 +274,10 @@ def normalize(text, decimals=3, mask_patterns=None):
         for pattern in mask_patterns:
             text = pattern.sub("<mask>", text)
     text = DECIMAL_RE.sub(lambda match: format_decimal(match.group(0), decimals), text)
+    # Paper prints the Brigadier context snippet on a separate line while vanilla
+    # appends it to the message; strip it so only the actual error is compared.
+    text = _strip_error_context(text, command)
+    text = COMPOUND_RE.sub(_canonical_compound, text)
     lines = [line.rstrip() for line in text.split("\n")]
     while lines and not lines[-1]:
         lines.pop()
@@ -408,10 +461,191 @@ def case_bot_attack():
     ]
 
 
+
+def _bot_setup_steps():
+    """Common unfrozen setup: bot spawned, empty inventory, standing at 0.5,-60,0.5."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(20),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+    ]
+
+
+def _bot_teardown_steps():
+    return [
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/kill @e[type=minecraft:snowball]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_inventory():
+    """hotbar / swapHands / drop / dropStack inventory semantics."""
+    return _bot_setup_steps() + [
+        cmd("/data get entity Steve playerGameType"),
+        cmd("/item replace entity Steve hotbar.0 with minecraft:stone 1"),
+        cmd("/item replace entity Steve hotbar.1 with minecraft:dirt 64"),
+        cmd("/item replace entity Steve hotbar.2 with minecraft:gold_ingot 3"),
+        cmd("/item replace entity Steve weapon.offhand with minecraft:diamond 2"),
+        wait_for(2),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/data get entity Steve Inventory[2]"),
+        cmd("/data get entity Steve Inventory[3]"),
+        cmd("/data get entity Steve Inventory[4]"),
+        cmd("/data get entity Steve SelectedItemSlot"),
+        cmd("/player Steve hotbar 2", wait_ticks=2),
+        cmd("/data get entity Steve SelectedItemSlot"),
+        cmd("/player Steve swapHands", wait_ticks=2),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/data get entity Steve Inventory[2]"),
+        cmd("/data get entity Steve Inventory[3]"),
+        cmd("/data get entity Steve Inventory[4]"),
+        cmd("/player Steve drop", wait_ticks=2),
+        cmd("/tp Steve 8 -60 8"),
+        wait_for(4),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/data get entity Steve Inventory[2]"),
+        cmd("/data get entity Steve Inventory[3]"),
+        cmd("/data get entity Steve Inventory[4]"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve hotbar 1", wait_ticks=2),
+        cmd("/player Steve dropStack", wait_ticks=2),
+        cmd("/tp Steve 8 -60 8"),
+        wait_for(4),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/data get entity Steve Inventory[2]"),
+        cmd("/data get entity Steve Inventory[3]"),
+        cmd("/data get entity Steve Inventory[4]"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve drop all", wait_ticks=2),
+        cmd("/tp Steve 8 -60 8"),
+        wait_for(4),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/data get entity Steve Inventory[2]"),
+        cmd("/data get entity Steve Inventory[3]"),
+        cmd("/data get entity Steve Inventory[4]"),
+        cmd("/kill @e[type=minecraft:item]"),
+    ] + _bot_teardown_steps()
+
+
+def case_bot_use():
+    """use on block (lever toggle) and use item (snowball throw)."""
+    return _bot_setup_steps() + [
+        cmd("/setblock 2 -61 0 minecraft:stone"),
+        cmd("/setblock 2 -60 0 minecraft:lever[face=floor]"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        cmd("/player Steve look at 2.5 -59.5 0.5", wait_ticks=2),
+        cmd("/execute if block 2 -60 0 minecraft:lever[powered=true]"),
+        cmd("/player Steve use", wait_ticks=2),
+        cmd("/execute if block 2 -60 0 minecraft:lever[powered=true]"),
+        cmd("/player Steve use", wait_ticks=2),
+        cmd("/execute if block 2 -60 0 minecraft:lever[powered=true]"),
+        cmd("/item replace entity Steve hotbar.0 with minecraft:snowball 3"),
+        cmd("/player Steve hotbar 1", wait_ticks=2),
+        cmd("/player Steve look up", wait_ticks=2),
+        cmd("/player Steve use", wait_ticks=2),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/data get entity Steve Inventory[2]"),
+        cmd("/data get entity Steve Inventory[3]"),
+        cmd("/data get entity Steve Inventory[4]"),
+        cmd("/execute if entity @e[type=minecraft:snowball]"),
+        cmd("/setblock 2 -60 0 minecraft:air"),
+        cmd("/setblock 2 -61 0 minecraft:air"),
+    ] + _bot_teardown_steps()
+
+
+def case_bot_mine():
+    """block breaking: creative instant break and survival hand mining."""
+    return _bot_setup_steps() + [
+        cmd("/data get entity Steve playerGameType"),
+        cmd("/setblock 1 -60 0 minecraft:stone"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        cmd("/player Steve look at 1.5 -59.5 0.5", wait_ticks=2),
+        cmd("/player Steve attack", wait_ticks=2),
+        cmd("/execute if block 1 -60 0 minecraft:air"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(20),
+        cmd("/data get entity Steve playerGameType"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        cmd("/setblock 1 -60 0 minecraft:stone"),
+        cmd("/player Steve look at 1.5 -59.5 0.5", wait_ticks=2),
+        cmd("/player Steve attack continuous"),
+        wait_for(220),
+        cmd("/player Steve stop", wait_ticks=1),
+        cmd("/execute if block 1 -60 0 minecraft:air"),
+        cmd("/setblock 1 -60 0 minecraft:air"),
+    ] + _bot_teardown_steps()
+
+
+def case_bot_mount():
+    """mount / dismount a boat and compare the resulting player position."""
+    return _bot_setup_steps() + [
+        cmd("/summon minecraft:oak_boat 2.5 -60 0.5"),
+        cmd("/tp Steve 1.5 -60 0.5 0 0"),
+        cmd("/player Steve look at 2.5 -60 0.5", wait_ticks=2),
+        cmd("/data get entity Steve Pos"),
+        cmd("/player Steve mount", wait_ticks=2),
+        cmd("/data get entity Steve Pos"),
+        cmd("/execute if entity @e[type=minecraft:oak_boat]"),
+        cmd("/player Steve dismount", wait_ticks=2),
+        cmd("/data get entity Steve Pos"),
+        cmd("/kill @e[type=minecraft:oak_boat]"),
+    ] + _bot_teardown_steps()
+
+
+def case_bot_cmd_errors():
+    """command tree / argument parsing and error-message parity."""
+    return _bot_setup_steps() + [
+        cmd("/player"),
+        cmd("/player Steve"),
+        cmd("/player Steve spawn in"),
+        cmd("/player Steve spawn in creative extra"),
+        cmd("/player Steve look"),
+        cmd("/player Steve look at"),
+        cmd("/player Steve turn sideways"),
+        cmd("/player Steve move sideways"),
+        cmd("/player Steve hotbar 0"),
+        cmd("/player Steve hotbar 10"),
+        cmd("/player Steve attack interval 0"),
+        cmd("/player Steve attack sometimes"),
+        cmd("/player Steve drop 41"),
+        cmd("/player Steve mount maybe"),
+        cmd("/player nobody kill"),
+        cmd("/player Steve spawn"),
+        cmd("/player Steve spawn"),
+    ] + _bot_teardown_steps()
+
+
 CASES = {
     "smoke": ("vanilla sanity checks (world/blocks/entities/list)", case_smoke),
     "bot_basic": ("spawn bot, look/move/stop, read position/rotation", case_bot_basic),
     "bot_attack": ("spawn bot, attack a static zombie, compare damage", case_bot_attack),
+    "bot_inventory": ("hotbar/swapHands/drop/dropStack inventory semantics", case_bot_inventory),
+    "bot_use": ("use on lever block and use snowball item", case_bot_use),
+    "bot_mine": ("creative instant break and survival hand mining", case_bot_mine),
+    "bot_mount": ("mount/dismount a boat", case_bot_mount),
+    "bot_cmd_errors": ("command tree and argument error parity", case_bot_cmd_errors),
 }
 
 
@@ -671,7 +905,7 @@ def main(argv):
                     normalized["sapling"] = outputs["sapling"]
                 else:
                     for name in names:
-                        normalized[name] = normalize(outputs[name], args.decimals, mask_patterns)
+                        normalized[name] = normalize(outputs[name], args.decimals, mask_patterns, step.command)
                 if normalized["ref"] == normalized["sapling"]:
                     matched += 1
                     match = True
