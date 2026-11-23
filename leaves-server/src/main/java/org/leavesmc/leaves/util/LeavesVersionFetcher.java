@@ -35,22 +35,16 @@ public class LeavesVersionFetcher extends PaperVersionFetcher {
     private static final int DISTANCE_UNKNOWN = -2;
     private static final String DOWNLOAD_PAGE = "https://leavesmc.org/downloads/leaves";
 
+    // Sapling start - upstream update check is disabled: no network calls to LeavesMC services
     @NotNull
     @Override
     public Component getVersionMessage() {
-        final Component updateMessage;
-        final ServerBuildInfo build = ServerBuildInfo.buildInfo();
-        if (build.buildNumber().isEmpty() && build.gitCommit().isEmpty()) {
-            updateMessage = text("You are running a development version without access to version information", color(0xFF5300));
-        } else if (build.buildNumber().isEmpty()) {
-            updateMessage = text("You are running a development version from CI", color(0xFF5300));
-        } else {
-            updateMessage = getUpdateStatusMessage("LeavesMC/Leaves", build);
-        }
+        final Component notice = text("Sapling", NamedTextColor.GOLD)
+            .append(text(" is a fork of Leaves. Automatic update check is disabled.", NamedTextColor.GRAY));
         final @Nullable Component history = this.getHistory();
-
-        return history != null ? Component.textOfChildren(updateMessage, Component.newline(), history) : updateMessage;
+        return history != null ? Component.textOfChildren(notice, Component.newline(), history) : notice;
     }
+    // Sapling end
 
     private static Component getUpdateStatusMessage(@NotNull final String repo, @NotNull final ServerBuildInfo build) {
         int distance = fetchDistanceFromLeavesApiV2Build(build);

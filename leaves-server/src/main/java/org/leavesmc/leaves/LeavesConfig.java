@@ -66,6 +66,9 @@ public final class LeavesConfig {
     public static YamlConfiguration config;
 
     public static void init(final @NotNull File file) {
+        // Sapling start - disable Paper's upstream startup version check (no calls to papermc.io / Leaves update API)
+        System.setProperty("paper.disableStartupVersionCheck", "true");
+        // Sapling end
         LeavesConfig.configFile = file;
         config = new YamlConfiguration();
         config.options().setHeader(Collections.singletonList(CONFIG_HEADER));
@@ -1207,7 +1210,7 @@ public final class LeavesConfig {
         }
 
         @GlobalConfig(value = "server-mod-name")
-        public String serverModName = "Leaves";
+        public String serverModName = "Sapling";
 
         @GlobalConfig("bstats-privacy-mode")
         public boolean bstatsPrivacyMode = false;
