@@ -150,6 +150,7 @@ python3 tools/parity/parity.py --commands my-case.txt --ticks 2 # your own seque
 python3 tools/parity/parity.py --list-cases
 python3 tools/parity/check-status.py    # server-list ping player sample parity
 python3 tools/parity/check-restart.py   # fake players are not persisted across restarts
+python3 tools/parity/check-log.py       # join/leave/death console log messages
 ```
 
 `run-suite.sh` stops both servers, resets their worlds, restarts them and runs
@@ -272,8 +273,17 @@ are normalised or worked around in the harness:
 | bot_use_continuous | 21 | continuous use consumes the whole snowball stack |
 | bot_portal | 17 | nether portal travel |
 | bot_sleep | 25 | sleep in bed, night skip, wake up |
+| bot_action_interval | 21 | attack with an explicit interval and stop |
+| bot_drop_slots | 33 | drop mainhand / offhand / explicit slot |
+| bot_use_place | 19 | use a placeable item to put down a block |
 
-Total: ~559 RCON command comparisons, 0 differences.
+Total: ~632 RCON command comparisons, 0 differences.
+
+Console log parity (`check-log.py`): the join/leave/death lines printed for a
+fake player are the same on both servers (`joined the game`, `logged in with
+entity id ...`, `died`, `lost connection: ...`, `left the game`); only the
+entity id counter and Paper's dimension prefix in the login line differ, which
+the check normalises.
 
 Restart persistence (`check-restart.py`): after spawning a fake player and
 restarting both servers, neither restores the fake (Carpet semantics: fake

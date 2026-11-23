@@ -1161,6 +1161,117 @@ def case_bot_sleep():
     ]
 
 
+
+def case_bot_action_interval():
+    """attack with an explicit interval: damage rate and stop behaviour."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/gamerule natural_regeneration false"),
+        cmd("/time set midnight"),
+        cmd("/kill @e[type=minecraft:zombie]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(80),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/summon minecraft:zombie 1.5 -60 0.5 {NoAI:1b,PersistenceRequired:1b}"),
+        cmd("/player Steve look at 1.5 -59.5 0.5", wait_ticks=2),
+        cmd("/player Steve attack interval 5"),
+        wait_game_ticks(20),
+        cmd("/data get entity @e[type=minecraft:zombie,limit=1] Health", tolerance=1.0),
+        wait_game_ticks(20),
+        cmd("/data get entity @e[type=minecraft:zombie,limit=1] Health", tolerance=1.0),
+        cmd("/player Steve stop", wait_ticks=2),
+        wait_game_ticks(10),
+        cmd("/data get entity @e[type=minecraft:zombie,limit=1] Health", tolerance=1.0),
+        cmd("/kill @e[type=minecraft:zombie]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_drop_slots():
+    """drop mainhand / offhand / explicit slot and verify inventory and dropped items."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(80),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/item replace entity Steve hotbar.0 with minecraft:stone 1"),
+        cmd("/item replace entity Steve hotbar.1 with minecraft:dirt 2"),
+        cmd("/item replace entity Steve hotbar.2 with minecraft:gold_ingot 3"),
+        cmd("/item replace entity Steve weapon.offhand with minecraft:diamond 4"),
+        wait_for(2),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/data get entity Steve Inventory[2]"),
+        cmd("/data get entity Steve Inventory[3]"),
+        cmd("/player Steve hotbar 1", wait_ticks=2),
+        cmd("/player Steve drop mainhand", wait_ticks=2),
+        cmd("/tp Steve 8 -60 8"),
+        wait_for(2),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve drop offhand", wait_ticks=2),
+        cmd("/tp Steve 8 -60 8"),
+        wait_for(2),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/data get entity Steve Inventory[3]"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve drop 2", wait_ticks=2),
+        cmd("/tp Steve 8 -60 8"),
+        wait_for(2),
+        cmd("/data get entity Steve Inventory[2]"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_use_place():
+    """use with a placeable item places a block and consumes one item."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(80),
+        cmd("/clear Steve"),
+        cmd("/setblock 2 -60 0 minecraft:air"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/item replace entity Steve hotbar.0 with minecraft:stone 3"),
+        cmd("/player Steve hotbar 1", wait_ticks=2),
+        cmd("/player Steve look at 2.5 -61 0.5", wait_ticks=2),
+        cmd("/execute if block 2 -60 0 minecraft:air"),
+        cmd("/player Steve use", wait_ticks=2),
+        cmd("/execute if block 2 -60 0 minecraft:stone"),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/setblock 2 -60 0 minecraft:air"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
 CASES = {
     "smoke": ("vanilla sanity checks (world/blocks/entities/list)", case_smoke),
     "bot_basic": ("spawn bot, look/move/stop, read position/rotation", case_bot_basic),
@@ -1185,6 +1296,9 @@ CASES = {
     "bot_use_continuous": ("continuous use throws the whole snowball stack", case_bot_use_continuous),
     "bot_portal": ("nether portal travel for fake players", case_bot_portal),
     "bot_sleep": ("sleeping in a bed: occupied state, night skip, wake-up", case_bot_sleep),
+    "bot_action_interval": ("attack with an explicit interval action", case_bot_action_interval),
+    "bot_drop_slots": ("drop mainhand/offhand/explicit slot", case_bot_drop_slots),
+    "bot_use_place": ("use a placeable item to place a block", case_bot_use_place),
 }
 
 
