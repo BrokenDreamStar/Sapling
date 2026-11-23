@@ -151,6 +151,8 @@ python3 tools/parity/parity.py --list-cases
 python3 tools/parity/check-status.py    # server-list ping player sample parity
 python3 tools/parity/check-restart.py   # fake players are not persisted across restarts
 python3 tools/parity/check-log.py       # join/leave/death console log messages
+python3 tools/parity/check-data.py      # on-disk stats/advancements parity
+python3 tools/parity/check-config.py    # allowSpawningOfflinePlayers=false branch (online mode)
 ```
 
 `run-suite.sh` stops both servers, resets their worlds, restarts them and runs
@@ -278,6 +280,19 @@ are normalised or worked around in the harness:
 | bot_use_place | 19 | use a placeable item to put down a block |
 
 Total: ~632 RCON command comparisons, 0 differences.
+
+On-disk player data (`check-data.py`): after a scenario that mines a block,
+picks it up, receives an item and throws a snowball, both servers write the same
+deterministic statistics sections (`mined`, `picked_up`, `used`, ...) and the
+same advancement entries (recipe unlocks, adventuring_time); only the offline
+UUID file name (vanilla vs CraftBukkit offline-uuid layout), time counters and
+the top-level DataVersion are normalised.
+
+Config branch (`check-config.py`): `allowSpawningOfflinePlayers` only matters
+in online mode, so both servers are started with `PARITY_ONLINE_MODE=true` and
+the system proxy as JVM options. With the rule disabled both refuse
+`/player <unknown> spawn` with the identical Carpet error message and spawn
+nothing; with the rule enabled both accept it the same way.
 
 Console log parity (`check-log.py`): the join/leave/death lines printed for a
 fake player are the same on both servers (`joined the game`, `logged in with
