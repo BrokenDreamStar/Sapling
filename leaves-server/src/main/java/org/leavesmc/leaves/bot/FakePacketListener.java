@@ -29,6 +29,30 @@ public class FakePacketListener extends ServerGamePacketListenerImpl
         }
     }
 
+    // Paper's ServerPlayer.isInvulnerableTo() treats a player whose client has not
+    // loaded yet as invulnerable. A fake player has no client, and Carpet's fake
+    // players are damageable immediately, so report the client as loaded right away.
+    @Override
+    public boolean hasClientLoaded() {
+        return true;
+    }
+
+    @Override
+    public void tickClientLoadTimeout() {
+        // no client to wait for
+    }
+
+    @Override
+    public void tick() {
+        // fake connections are not part of the network tick loop; keep-alive and
+        // timeout handling do not apply
+    }
+
+    @Override
+    public boolean isAcceptingMessages() {
+        return true;
+    }
+
     @Override
     public void teleport(PositionMoveRotation positionMoveRotation, Set<Relative> set)
     {

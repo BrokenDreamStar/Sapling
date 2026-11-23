@@ -139,20 +139,25 @@ tools/parity/run-sapling.sh --stop
 
 ## 4. Run parity checks
 
-~~~
+```
+tools/parity/run-suite.sh                # all 18 cases, fresh world per case
+tools/parity/run-suite.sh bot_physics    # selected cases only
 python3 tools/parity/parity.py --case smoke        # 19 vanilla sanity commands
-python3 tools/parity/parity.py --case bot_basic    # 30 steps: spawn/look/move/stop/kill
-python3 tools/parity/parity.py --case bot_attack   # 32 steps: spawn/attack zombie/damage
-python3 tools/parity/parity.py --case bot_basic --only ref      # single-server smoke test
+python3 tools/parity/parity.py --case bot_basic    # spawn/look/move/stop/kill
+python3 tools/parity/parity.py --case bot_physics --tolerance 0.75
+python3 tools/parity/parity.py --case bot_basic --only ref      # single-server test
 python3 tools/parity/parity.py --commands my-case.txt --ticks 2 # your own sequence
 python3 tools/parity/parity.py --list-cases
-~~~
+```
+
+`run-suite.sh` stops both servers, resets their worlds, restarts them and runs
+each case in isolation (state from a previous case cannot leak into the next).
 
 Useful options:
 
 | option | meaning |
 |---|---|
-| --case NAME | built-in case: smoke, bot_basic, bot_attack (default: smoke) |
+| --case NAME | built-in case (default: smoke); see --list-cases |
 | --commands FILE | run a command list instead of a built-in case |
 | --ticks N | default wait after each command, in game ticks (commands file default 2); overrides built-in post-command waits |
 | --only both/ref/sapling | which server(s) to drive (default both) |
@@ -161,6 +166,7 @@ Useful options:
 | --decimals N | decimal places kept when normalising (default 3) |
 | --mask REGEX | mask extra per-server text before comparison (repeatable) |
 | --raw | compare raw output without normalisation |
+| --tolerance N | allow absolute numeric differences up to N (tick jitter; default 0 = exact) |
 | --save-dir DIR | write transcript.txt and report.json |
 | --stop | send /stop to the selected server(s) and exit |
 
@@ -196,29 +202,76 @@ sapling) per command, followed by a summary; --save-dir keeps the raw outputs.
   cases therefore /forceload add 0 0 first (and remove it afterwards).
 - **Gamerule names are snake_case in 26.1**: advance_time (was
   doDaylightCycle), advance_weather, spawn_mobs, ... The cases use those names.
-- **Bot timing**: built-in cases use /tick freeze plus /tick step N so bot
-  movement is measured in exact game ticks, not wall-clock time. After each
-  /tick step the harness waits a little wall-clock slack, and uses sync
-  barriers (/execute if entity Steve) after spawn/kill so that spawn timing
-  differences do not create false diffs.
+- **Bot timing**: most cases run the server normally and use sync barriers
+  (/execute if entity Steve) after spawn/kill. Movement physics is measured
+  with game-clock waits (/time query gametime, `--tolerance` absorbs the
+  remaining one-tick command-phase jitter). Early cases can use /tick freeze +
+  /tick step; note that on both servers fake players do not tick during frozen
+  steps, so tick-frozen cases are only used for setup/teardown.
+- **Zombies burn in daylight on both servers** (vanilla 26.1 behaviour), which
+  silently adds damage over time to any summoned zombie. Cases that measure
+  attack damage run at night (`/time set midnight`).
 - **Flat world surface** of the generated preset is y=-60 (bedrock -64,
   dirt -63..-62, grass -61); bot cases assume that.
-- Carpet 26.1's fake players spawn in **creative mode** (playerGameType 1) on
-  the reference server; single /player attack damage is small and differs
-  slightly between the two servers today (see validation below).
+- Console-issued `/player <name> spawn` spawns fake players in **creative
+  mode** (playerGameType 1) on both servers; the cases additionally spawn
+  `in survival` when damage/health is being measured.
+
+## Platform differences (not fake-player bugs)
+
+These were found while comparing the Paper-based Sapling with Fabric/Carpet and
+are normalised or worked around in the harness:
+
+- **RCON long output**: Paper truncates long command feedback (~100 chars,
+  ending in "..."), vanilla/Carpet sends it whole. Cases query NBT by short
+  paths/inventory index instead of dumping large compounds.
+- **Brigadier error context**: vanilla appends the "context" snippet to the
+  error line; Paper sends it on a separate line. parity.py strips the context.
+- **NBT compound key order**: Paper and vanilla serialize compound tags in
+  different key order; parity.py sorts flat compound fields before diffing.
+- **Chunk unload delay**: Paper keeps chunks loaded for
+  `WorldConfiguration.delayChunkUnloadsBy` (default 10 s) after a player
+  leaves; vanilla unloads immediately. bot_chunkload waits past the delay.
+- **Paper client-load invulnerability**: Paper treats players whose client has
+  not "loaded" as invulnerable for the first 60 ticks. Sapling overrides
+  `hasClientLoaded()` in FakePacketListener to return true, matching Carpet.
+- **Paper/Leaves spawn invulnerability**: vanilla 26.1 gives players 60 ticks
+  of spawn invulnerability and Carpet fake players inherit it. Leaves disables
+  it by config; Sapling's port re-enables it for FakePlayer only so fake
+  players behave like Carpet's.
 
 ## Validation performed (2026-11-24, real servers, real RCON)
 
-Both servers were actually launched and driven through parity.py:
+`run-suite.sh` was run repeatedly against freshly reset worlds; current status
+(all cases matched, 0 differed):
 
-- smoke: 19/19 commands matched (block/entity/seed/list/forceload behaviour)
-- bot_basic: 30/30 matched on a fresh server start and on an immediate rerun
-  (spawn, teleport, rotation, move forward for 5 ticks, stop, kill, /list)
-- bot_attack: 30/32 matched; the two remaining diffs are a genuine behavioural
-  finding of the port: after one /player attack the reference zombie has
-  Health 19.205f while Sapling's has 19.06f (0.795 vs 0.94 damage).
-- parity.py --stop stopped both servers cleanly over RCON.
-- setup-carpet.sh was re-run and reported all artifacts cached (idempotent).
+| case | compared | purpose |
+|---|---|---|
+| smoke | 19 | world/blocks/entities/seed/list |
+| bot_basic | 30 | spawn, look/turn, move/stop, rotation, kill |
+| bot_attack | 30 | attack a NoAI zombie, damage and knockback |
+| bot_inventory | 57 | hotbar/swapHands/drop/dropStack, per-slot NBT |
+| bot_use | 34 | use on lever block, use snowball item |
+| bot_mine | 30 | creative instant break, survival hand mining |
+| bot_mount | 23 | mount/dismount boat, position while riding |
+| bot_cmd_errors | 30 | command tree/argument error parity |
+| bot_spawn | 28 | spawn argument matrix (pos/facing/dim/gamemode/spectator) |
+| bot_fall | 12 | fall damage on a survival fake player |
+| bot_death | 19 | death by /damage, list removal, item drops |
+| bot_playerdata | 17 | playerdata saved on disconnect and reloaded |
+| bot_chunkload | 11 | fake player keeps its chunks loaded |
+| bot_hurt | 16 | spawn invulnerability window, then damageable |
+| bot_physics | 31 | tick-synced walk/sneak/sprint distances, jump arc |
+| bot_use_entity | 30 | dye a sheep, fill an item frame |
+| bot_knockback | 28 | knockback vector, normal vs sprint attack |
+| bot_dimensions | 13 | spawn in the nether and the end |
+
+Total: ~456 RCON command comparisons, 0 differences.
+
+Known remaining coverage gaps (not yet ported/tested): shadow (needs a real
+client), fake-player interaction with mob AI targeting, sleeping in beds,
+portal/dimension travel, server-ping player sample listing, and restart
+persistence behaviour.
 
 ## Troubleshooting
 

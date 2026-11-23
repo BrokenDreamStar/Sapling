@@ -288,14 +288,15 @@ def normalize(text, decimals=3, mask_patterns=None, command=None):
 # Command steps and built-in cases
 # ---------------------------------------------------------------------------
 class Step:
-    __slots__ = ("command", "wait_ticks", "note", "sync_expect", "sync_timeout")
+    __slots__ = ("command", "wait_ticks", "note", "sync_expect", "sync_timeout", "game_ticks")
 
-    def __init__(self, command, wait_ticks=0.0, note=None, sync_expect=None, sync_timeout=15.0):
+    def __init__(self, command, wait_ticks=0.0, note=None, sync_expect=None, sync_timeout=15.0, game_ticks=0.0):
         self.command = command
         self.wait_ticks = float(wait_ticks)
         self.note = note
         self.sync_expect = sync_expect
         self.sync_timeout = float(sync_timeout)
+        self.game_ticks = float(game_ticks)
 
     def __repr__(self):
         if self.command is None:
@@ -303,8 +304,13 @@ class Step:
         return "Step(" + self.command + ")"
 
 
-def cmd(command, wait_ticks=0.0):
-    return Step(command, wait_ticks)
+def cmd(command, wait_ticks=0.0, game_ticks=0.0):
+    return Step(command, wait_ticks, game_ticks=game_ticks)
+
+
+def wait_game_ticks(ticks):
+    """Sleep exactly *ticks* server game ticks (server must be running normally)."""
+    return Step(None, game_ticks=ticks)
 
 
 def wait_for(ticks):
@@ -637,6 +643,346 @@ def case_bot_cmd_errors():
     ] + _bot_teardown_steps()
 
 
+
+def case_bot_spawn():
+    """spawn argument matrix: position/facing/dimension/gamemode variants."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(10),
+        cmd("/data get entity Steve playerGameType"),
+        cmd("/data get entity Steve Pos"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(10),
+        cmd("/data get entity Steve playerGameType"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/player Steve spawn at 10 5 10 facing 90 0 in minecraft:overworld in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(5),
+        cmd("/data get entity Steve Pos"),
+        cmd("/data get entity Steve Rotation"),
+        cmd("/data get entity Steve playerGameType"),
+        cmd("/player Steve spawn", wait_ticks=1),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/player Steve spawn at 0 -1000 0", wait_ticks=1),
+        cmd("/player averyveryverylongname spawn", wait_ticks=1),
+        cmd("/player Karl spawn in spectator", wait_ticks=2),
+        sync_until("/execute if entity Karl", "Test passed"),
+        wait_for(20),
+        cmd("/data get entity Karl playerGameType"),
+        cmd("/data get entity Karl Pos"),
+        cmd("/list"),
+        cmd("/player Karl kill", wait_ticks=1),
+        sync_until("/execute unless entity Karl", "Test passed"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_fall():
+    """fall damage parity for a survival fake player."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(10),
+        cmd("/data get entity Steve Health"),
+        cmd("/tp Steve 0.5 -50 0.5"),
+        wait_for(400),
+        cmd("/data get entity Steve Health"),
+        cmd("/data get entity Steve Pos"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_death():
+    """death handling: list removal, item drops and no XP orbs."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(60),
+        cmd("/item replace entity Steve hotbar.0 with minecraft:stone 5"),
+        cmd("/item replace entity Steve hotbar.1 with minecraft:dirt 3"),
+        wait_for(2),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/damage Steve 100"),
+        cmd("/damage Steve 100 minecraft:generic"),
+        wait_for(40),
+        cmd("/list"),
+        cmd("/execute if entity Steve"),
+        cmd("/data get entity Steve Health"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/execute if entity @e[type=minecraft:experience_orb]"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_playerdata():
+    """player data is saved on disconnect and reloaded on the next spawn."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(10),
+        cmd("/clear Steve"),
+        cmd("/item replace entity Steve hotbar.0 with minecraft:apple 7"),
+        cmd("/item replace entity Steve hotbar.1 with minecraft:stick 4"),
+        wait_for(2),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        wait_for(10),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(10),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/data get entity Steve Inventory[1]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_chunkload():
+    """a fake player keeps its surrounding chunks loaded (block access far away)."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn at 1000 -60 1000", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(40),
+        cmd("/execute if block 1000 -61 1000 minecraft:grass_block"),
+        cmd("/execute if block 1003 -61 1000 minecraft:grass_block"),
+        cmd("/execute if block 1000 -60 1000 minecraft:air"),
+        cmd("/data get entity Steve Pos"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        # Paper keeps chunks loaded for delayChunkUnloadsBy (default 10 s) after a
+        # player leaves; vanilla/Carpet unloads immediately, so wait past the delay.
+        wait_for(260),
+        cmd("/execute if block 1003 -61 1000 minecraft:grass_block"),
+    ]
+
+
+def case_bot_hurt():
+    """spawn invulnerability and damageability of a fake player.
+
+    Vanilla 26.1 gives players 60 ticks of spawn invulnerability; Carpet's fake
+    players inherit it, so Sapling's must too.
+    """
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(10),
+        cmd("/data get entity Steve Health"),
+        cmd("/damage Steve 1 minecraft:magic"),
+        wait_for(5),
+        cmd("/data get entity Steve Health"),
+        wait_for(80),
+        cmd("/damage Steve 1 minecraft:magic"),
+        wait_for(5),
+        cmd("/data get entity Steve Health"),
+        cmd("/damage Steve 100 minecraft:generic"),
+        wait_for(40),
+        cmd("/list"),
+        cmd("/execute if entity Steve"),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_physics():
+    """game-tick synchronised movement: walk/sneak/sprint distance and jump arc."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(80),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/data get entity Steve Pos"),
+        cmd("/player Steve move forward", game_ticks=40),
+        cmd("/player Steve stop", wait_ticks=1),
+        cmd("/data get entity Steve Pos"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/player Steve sneak", game_ticks=2),
+        cmd("/player Steve move forward", game_ticks=40),
+        cmd("/player Steve stop", wait_ticks=1),
+        cmd("/player Steve unsneak"),
+        cmd("/data get entity Steve Pos"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/player Steve sprint", game_ticks=2),
+        cmd("/player Steve move forward", game_ticks=40),
+        cmd("/player Steve stop", wait_ticks=1),
+        cmd("/player Steve unsprint"),
+        cmd("/data get entity Steve Pos"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(40),
+        cmd("/player Steve jump", game_ticks=2),
+        cmd("/data get entity Steve Pos"),
+        wait_game_ticks(3),
+        cmd("/data get entity Steve Pos"),
+        wait_for(40),
+        cmd("/data get entity Steve Pos"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+
+def case_bot_use_entity():
+    """use action on entities: dye a sheep and place an item in an item frame."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/kill @e[type=minecraft:sheep]"),
+        cmd("/kill @e[type=minecraft:item_frame]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(60),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/summon minecraft:sheep 1.5 -60 0.5 {NoAI:1b,Color:0b,Silent:1b}"),
+        cmd("/player Steve look at 1.5 -59.5 0.5", wait_ticks=2),
+        cmd("/item replace entity Steve hotbar.0 with minecraft:red_dye 2"),
+        cmd("/player Steve hotbar 1", wait_ticks=2),
+        cmd("/player Steve use", wait_ticks=2),
+        cmd("/data get entity @e[type=minecraft:sheep,limit=1] Color"),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/player Steve use", wait_ticks=2),
+        cmd("/data get entity Steve Inventory[0]"),
+        cmd("/summon minecraft:item_frame 1.5 -60.5 0.5 {Facing:3b,TileX:1,TileY:-61,TileZ:0}"),
+        cmd("/player Steve look at 1.5 -60.5 0.5", wait_ticks=2),
+        cmd("/item replace entity Steve hotbar.0 with minecraft:diamond 1"),
+        cmd("/player Steve use", wait_ticks=2),
+        cmd("/data get entity @e[type=minecraft:item_frame,limit=1] Item"),
+        cmd("/tp Steve 8 -60 8"),
+        wait_for(2),
+        cmd("/kill @e[type=minecraft:sheep]"),
+        cmd("/kill @e[type=minecraft:item_frame]"),
+        wait_for(2),
+        cmd("/kill @e[type=minecraft:item]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_knockback():
+    """attack knockback: normal and sprinting attacks against a NoAI zombie."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/forceload add 0 0", wait_ticks=1),
+        cmd("/gamerule advance_time false"),
+        cmd("/gamerule spawn_mobs false"),
+        cmd("/time set midnight"),
+        cmd("/kill @e[type=minecraft:zombie,tag=parity_target]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn in survival", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(80),
+        cmd("/clear Steve"),
+        cmd("/tp Steve 0.5 -60 0.5 0 0"),
+        wait_for(2),
+        cmd("/summon minecraft:zombie 1.5 -60 0.5 {NoAI:1b,PersistenceRequired:1b,Tags:[\"parity_target\"]}"),
+        cmd("/player Steve look at 1.5 -59.5 0.5", wait_ticks=2),
+        cmd("/player Steve attack", game_ticks=2),
+        cmd("/data get entity @e[type=minecraft:zombie,tag=parity_target,limit=1] Motion"),
+        cmd("/data get entity @e[type=minecraft:zombie,tag=parity_target,limit=1] Pos"),
+        cmd("/data get entity @e[type=minecraft:zombie,tag=parity_target,limit=1] Health"),
+        cmd("/kill @e[type=minecraft:zombie,tag=parity_target]"),
+        wait_for(10),
+        cmd("/summon minecraft:zombie 1.5 -60 0.5 {NoAI:1b,PersistenceRequired:1b,Tags:[\"parity_target\"]}"),
+        cmd("/player Steve look at 1.5 -59.5 0.5", wait_ticks=2),
+        cmd("/player Steve sprint", game_ticks=2),
+        cmd("/player Steve attack", game_ticks=2),
+        cmd("/player Steve unsprint"),
+        cmd("/data get entity @e[type=minecraft:zombie,tag=parity_target,limit=1] Motion"),
+        cmd("/data get entity @e[type=minecraft:zombie,tag=parity_target,limit=1] Pos"),
+        cmd("/data get entity @e[type=minecraft:zombie,tag=parity_target,limit=1] Health"),
+        cmd("/kill @e[type=minecraft:zombie,tag=parity_target]"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/forceload remove 0 0"),
+    ]
+
+
+def case_bot_dimensions():
+    """spawning fake players in the nether and the end."""
+    return [
+        cmd("/tick unfreeze"),
+        cmd("/player Steve kill", wait_ticks=1),
+        cmd("/player Steve spawn at 8 64 8 facing 0 0 in minecraft:the_nether", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(40),
+        cmd("/data get entity Steve Dimension"),
+        cmd("/data get entity Steve Pos"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/player Steve spawn at 0 64 0 facing 0 0 in minecraft:the_end", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(40),
+        cmd("/data get entity Steve Dimension"),
+        cmd("/data get entity Steve Pos"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+        cmd("/player Steve spawn at 0.5 -60 0.5", wait_ticks=2),
+        sync_until("/execute if entity Steve", "Test passed"),
+        wait_for(20),
+        cmd("/data get entity Steve Dimension"),
+        cmd("/player Steve kill", wait_ticks=1),
+        sync_until("/execute unless entity Steve", "Test passed"),
+    ]
+
+
 CASES = {
     "smoke": ("vanilla sanity checks (world/blocks/entities/list)", case_smoke),
     "bot_basic": ("spawn bot, look/move/stop, read position/rotation", case_bot_basic),
@@ -646,6 +992,16 @@ CASES = {
     "bot_mine": ("creative instant break and survival hand mining", case_bot_mine),
     "bot_mount": ("mount/dismount a boat", case_bot_mount),
     "bot_cmd_errors": ("command tree and argument error parity", case_bot_cmd_errors),
+    "bot_spawn": ("spawn argument matrix: pos/facing/dimension/gamemode", case_bot_spawn),
+    "bot_fall": ("fall damage for a survival fake player", case_bot_fall),
+    "bot_death": ("death handling: list removal and item drops", case_bot_death),
+    "bot_playerdata": ("player data saved on disconnect and reloaded on spawn", case_bot_playerdata),
+    "bot_chunkload": ("fake player keeps surrounding chunks loaded", case_bot_chunkload),
+    "bot_hurt": ("immediate damageability of a freshly spawned fake player", case_bot_hurt),
+    "bot_physics": ("tick-synchronised walk/sneak/sprint/jump physics", case_bot_physics),
+    "bot_use_entity": ("use action on sheep (dye) and item frame", case_bot_use_entity),
+    "bot_knockback": ("attack knockback, normal and sprinting", case_bot_knockback),
+    "bot_dimensions": ("spawn fake players in nether and end", case_bot_dimensions),
 }
 
 
@@ -707,6 +1063,51 @@ class Report:
     def emit(self, line=""):
         print(line)
         self.lines.append(line)
+
+
+GAMETIME_RE = re.compile(r"(\d+)")
+NUMBER_SPLIT_RE = re.compile(r"(-?\d+(?:\.\d+)?)")
+
+
+def _gametime(rcon):
+    output = rcon.command("/time query gametime")
+    match = GAMETIME_RE.search(output)
+    if not match:
+        raise RconError("cannot parse /time query gametime output: " + output)
+    return int(match.group(1))
+
+
+def wait_for_game_ticks(rcon, ticks):
+    """Block until the server's game clock advanced by *ticks* (running normally)."""
+    start = _gametime(rcon)
+    target = start + int(round(ticks))
+    deadline = time.monotonic() + max(15.0, ticks / 20.0 * 2.0 + 15.0)
+    while True:
+        if _gametime(rcon) >= target:
+            return
+        if time.monotonic() > deadline:
+            raise RconError(
+                "timed out waiting for " + str(ticks) + " game ticks on " + rcon.label
+            )
+        time.sleep(0.005)
+
+
+def outputs_within_tolerance(ref, sapling, tolerance):
+    """Compare two outputs allowing absolute numeric differences (tick jitter)."""
+    left = NUMBER_SPLIT_RE.split(ref)
+    right = NUMBER_SPLIT_RE.split(sapling)
+    if len(left) != len(right):
+        return False
+    for a, b in zip(left, right):
+        if a == b:
+            continue
+        try:
+            if abs(float(a) - float(b)) <= tolerance:
+                continue
+        except ValueError:
+            return False
+        return False
+    return True
 
 
 def sleep_ticks(ticks):
@@ -796,6 +1197,8 @@ def parse_args(argv):
                         help="decimal places kept when normalising coordinates (default: 3)")
     parser.add_argument("--mask", action="append", default=[], metavar="REGEX",
                         help="extra regex masked to <mask> before comparison (repeatable)")
+    parser.add_argument("--tolerance", type=float, default=0.0,
+                        help="absolute numeric tolerance for comparison (default 0 = exact)")
     parser.add_argument("--raw", action="store_true", help="compare raw RCON output without normalisation")
     parser.add_argument("--save-dir", default=None,
                         help="write transcript.txt and report.json into this directory")
@@ -866,8 +1269,14 @@ def main(argv):
         for index, step in enumerate(steps, 1):
             if step.command is None:
                 if args.verbose:
-                    report.emit("[%3d] wait %g ticks" % (index, step.wait_ticks))
-                sleep_ticks(step.wait_ticks)
+                    report.emit(
+                        "[%3d] wait %g ticks" % (index, step.game_ticks or step.wait_ticks)
+                    )
+                if step.game_ticks:
+                    for name in names:
+                        wait_for_game_ticks(targets[name], step.game_ticks)
+                else:
+                    sleep_ticks(step.wait_ticks)
                 continue
 
             if step.sync_expect is not None:
@@ -910,6 +1319,12 @@ def main(argv):
                     matched += 1
                     match = True
                     report.emit("      => MATCH")
+                elif args.tolerance > 0 and outputs_within_tolerance(
+                    normalized["ref"], normalized["sapling"], args.tolerance
+                ):
+                    matched += 1
+                    match = True
+                    report.emit("      => MATCH (within tolerance %g)" % args.tolerance)
                 else:
                     differed += 1
                     match = False
@@ -924,6 +1339,9 @@ def main(argv):
                     for line in diff:
                         report.emit("      " + line)
 
+            if step.game_ticks:
+                for name in names:
+                    wait_for_game_ticks(targets[name], step.game_ticks)
             report.records.append(
                 {
                     "index": index,

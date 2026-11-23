@@ -465,8 +465,8 @@ index 831b199ec928df707ad319bb9740db8f2b91e164..2fd8b98145c1659a71f0b0311a8714c5
  
              BlockPos effectPos = this.getOnPosLegacy();
              BlockState effectState = this.level().getBlockState(effectPos);
--            if (this.isLocalInstanceAuthoritative() || this instanceof org.leavesmc.leaves.bot.ServerBot) {  // Sapling - fake player needs check fall damage
-+            if (this.isLocalInstanceAuthoritative() || this instanceof org.leavesmc.leaves.bot.FakePlayer) {  // Sapling - fake player needs check fall damage
+-            if (this.isLocalInstanceAuthoritative() || this instanceof org.leavesmc.leaves.bot.ServerBot) {  // Leaves - ServerBot needs check fall damage
++            if (this.isLocalInstanceAuthoritative() || this instanceof org.leavesmc.leaves.bot.FakePlayer) {  // Leaves - ServerBot needs check fall damage
                  this.checkFallDamage(movement.y, this.onGround(), effectState, effectPos);
              }
  
