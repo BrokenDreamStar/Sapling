@@ -267,12 +267,12 @@ are normalised or worked around in the harness:
 | bot_use_entity | 30 | dye a sheep, fill an item frame |
 | bot_knockback | 28 | knockback vector, normal vs sprint attack |
 | bot_dimensions | 13 | spawn in the nether and the end |
-| bot_mob_ai | 20 | zombie AI targets/pushes/attacks a fake player |
+| bot_mob_ai | 22 | zombie AI targets a fake player and damages it |
 | bot_ender_pearl | 23 | ender pearl teleport for fake players |
 | bot_use_continuous | 21 | continuous use consumes the whole snowball stack |
 | bot_portal | 17 | nether portal travel |
 
-Total: ~535 RCON command comparisons, 0 differences.
+Total: ~537 RCON command comparisons, 0 differences.
 
 Restart persistence (`check-restart.py`): after spawning a fake player and
 restarting both servers, neither restores the fake (Carpet semantics: fake
