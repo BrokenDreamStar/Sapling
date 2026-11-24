@@ -21,7 +21,7 @@ mcversion=$(prop mcVersion)
 gradleVersion=$(prop version)
 preVersion=$(prop preVersion)
 tagid="$mcversion-$BUILD_NUMBER-$commitid"
-jarName="leaves-$mcversion.jar"
+jarName="sapling-$mcversion.jar"
 leavesid="Leaves-$tagid"
 releaseinfo="releaseinfo.md"
 discordmes="discordmes.json"
@@ -30,7 +30,7 @@ make_latest=$([ "$preVersion" = "true" ] && echo "false" || echo "true")
 rm -f $discordmes
 rm -f $releaseinfo
 
-mv leaves-server/build/libs/leaves-leavesclip-"$gradleVersion"-mojmap.jar "$jarName"
+mv leaves-server/build/libs/sapling-leavesclip-"$gradleVersion"-mojmap.jar "$jarName"
 {
   echo "name=$leavesid"
   echo "tag=$tagid"
