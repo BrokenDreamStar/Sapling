@@ -717,9 +717,6 @@ public final class LeavesConfig {
         @GlobalConfig("reduce-entity-allocations")
         public boolean reduceEntityAllocations = true;
 
-        @GlobalConfig("cache-climb-check")
-        public boolean cacheClimbCheck = true;
-
         @GlobalConfig("reduce-chuck-load-and-lookup")
         public boolean reduceChuckLoadAndLookup = true;
 
