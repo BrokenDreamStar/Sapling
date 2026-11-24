@@ -5,7 +5,7 @@
  import io.papermc.paperweight.attribute.DevBundleOutput
  import io.papermc.paperweight.util.*
  import java.time.Instant
-@@ -7,21 +_,33 @@
+@@ -7,24 +_,41 @@
      `java-library`
      `maven-publish`
      idea
@@ -27,6 +27,9 @@
 -    minecraftVersion = providers.gradleProperty("mcVersion")
 +    minecraftVersion = rootProject.providers.gradleProperty("mcVersion") // Leaves - build change
      gitFilePatches = false
++    // Sapling - publish artifacts under the fork's name
++    bundlerJarName = "sapling"
++    base.archivesName = "sapling-server"
  
 +    // Leaves start - build change
 +    val leaves = forks.register("leaves") {
@@ -43,6 +46,14 @@
      updatingMinecraft {
          // oldPaperCommit = "711c5de2b05df39b72c44ff54e9f9381f8d153cb"
      }
+ }
+ 
++// Sapling - name the runnable release jar after the fork (drop the launcher suffix)
++tasks.named<io.papermc.paperweight.tasks.CreateLeavesclipJar>("createLeavesclipJar") {
++    outputZip.set(layout.buildDirectory.file("libs/sapling-${project.version}.jar"))
++}
++
+ tasks.generateDevelopmentBundle {
 @@ -31,6 +_,7 @@
      libraryRepositories.addAll(
          "https://repo.maven.apache.org/maven2/",
