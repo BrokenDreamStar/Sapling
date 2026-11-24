@@ -379,6 +379,17 @@ so the Carpet-parity checks above are unaffected unless they are enabled.
   name is still used for the Mojang skin lookup, and every later Carpet command
   has to use the final name (same as Leaves). With the defaults the name is
   exactly the argument, so Carpet parity is unchanged.
+- **limit** (default `10`): server-wide limit for all fake players (0 or negative =
+  unlimited). `/player <name> spawn` and `/player <name> shadow` refuse to
+  create another fake player once the limit is reached
+  (`Bot number limit exceeded`, the old Leaves message).
+- **player-limit** (default `-1` = unlimited): fallback per-player limit used when
+  LuckPerms has no meta value for the player; 0 or negative = unlimited.
+- **luckperms-meta-key** (default `sapling-bot-limit`): LuckPerms meta key
+  resolved through the player's inherited (group) meta; an integer value (0 =
+  no bots, negative = unlimited) overrides `player-limit` for that player/group.
+  The hook is optional (reflection based): without LuckPerms the fallback applies.
+  Refusal message: `You have reached your bot limit (N)`.
 - **unable-fakeplayer-names** (default `[]`): blacklist checked by
   `/player <name> spawn` before creating anything (both the raw argument and the
   final prefixed/suffixed name are checked). A blocked name is refused with

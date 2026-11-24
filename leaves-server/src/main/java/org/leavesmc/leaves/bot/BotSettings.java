@@ -59,4 +59,19 @@ public final class BotSettings {
     public static boolean isUnableName(String name) {
         return LeavesConfig.fakeplayer.unableFakeplayerNames.contains(name);
     }
+
+    /** Sapling extension (from Leaves): server-wide fake player limit (0/negative = unlimited). */
+    public static int limit() {
+        return LeavesConfig.fakeplayer.limit;
+    }
+
+    /** Sapling extension: default per-player limit when LuckPerms has no meta value (0/negative = unlimited). */
+    public static int playerLimit() {
+        return LeavesConfig.fakeplayer.playerLimit;
+    }
+
+    /** Sapling extension: LuckPerms meta key that provides per-player/group bot limits. */
+    public static String luckPermsMetaKey() {
+        return LeavesConfig.fakeplayer.luckPermsMetaKey;
+    }
 }

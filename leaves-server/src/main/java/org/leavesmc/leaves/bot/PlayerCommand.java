@@ -196,6 +196,12 @@ public class PlayerCommand
             return true;
         }
 
+        // Sapling - restored Leaves bot count limits (server-wide + LuckPerms per-player)
+        if (!BotLimits.canCreate(context.getSource(), false))
+        {
+            return true;
+        }
+
         if (FakePlayer.isSpawningPlayer(playerName))
         {
             Messenger.m(context.getSource(), "r Player ", "rb " + playerName, "r  is currently logging on");
@@ -321,7 +327,8 @@ public class PlayerCommand
             Messenger.m(source, "rb Player " + playerName + " cannot be placed outside of the world");
             return 0;
         }
-        boolean success = FakePlayer.createFake(playerName, rawName, source.getServer(), pos, facing.y, facing.x, dimType, mode, flying);
+        ServerPlayer creator = source.getEntity() instanceof ServerPlayer serverPlayer ? serverPlayer : null;
+        boolean success = FakePlayer.createFake(playerName, rawName, creator, source.getServer(), pos, facing.y, facing.x, dimType, mode, flying);
         if (!success) {
             Messenger.m(source, "rb Player " + playerName + " doesn't exist and cannot spawn in online mode. " +
                     "Turn the server offline or the allowSpawningOfflinePlayers on to spawn non-existing players");
@@ -362,6 +369,9 @@ public class PlayerCommand
             Messenger.m(context.getSource(), "r Cannot shadow single-player server owner");
             return 0;
         }
+
+        // Sapling - the server-wide bot limit also covers shadow fake players
+        if (!BotLimits.canCreate(context.getSource(), true)) return 0;
 
         FakePlayer.createShadow(player.level().getServer(), player);
         return 1;

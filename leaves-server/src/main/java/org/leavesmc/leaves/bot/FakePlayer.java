@@ -55,11 +55,13 @@ public class FakePlayer extends ServerPlayer
     public Runnable fixStartingPosition = () -> {};
     public boolean isAShadow;
     public int notSleepTicks; // Sapling - fake player insomnia counter (Leaves spawn-phantom)
+    public UUID creatorUuid; // Sapling - player that created this bot (per-player bot limit)
+    public String creatorName;
 
     // Returns true if it was successful, false if couldn't spawn due to the player not existing in Mojang servers
     public static boolean createFake(String username, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying)
     {
-        return createFake(username, username, server, pos, yaw, pitch, dimensionId, gamemode, flying);
+        return createFake(username, username, null, server, pos, yaw, pitch, dimensionId, gamemode, flying);
     }
 
     /**
@@ -67,6 +69,15 @@ public class FakePlayer extends ServerPlayer
      * the visible name may carry a prefix/suffix while the skin account is the raw name).
      */
     public static boolean createFake(String username, String skinName, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying)
+    {
+        return createFake(username, skinName, null, server, pos, yaw, pitch, dimensionId, gamemode, flying);
+    }
+
+    /**
+     * Sapling - {@code creator} is the player who issued the spawn command (per-player bot limit);
+     * null for console/command-block spawns.
+     */
+    public static boolean createFake(String username, String skinName, ServerPlayer creator, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying)
     {
         //prolly half of that crap is not necessary, but it works
         ServerLevel worldIn = server.getLevel(dimensionId);
@@ -122,6 +133,8 @@ public class FakePlayer extends ServerPlayer
             }
 
             FakePlayer instance = new FakePlayer(server, worldIn, current, ClientInformation.createDefault(), false);
+            instance.creatorUuid = creator == null ? null : creator.getUUID();
+            instance.creatorName = creator == null ? null : creator.getGameProfile().name();
             instance.fixStartingPosition = () -> instance.snapTo(pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
             server.getPlayerList().placeNewPlayer(new FakeClientConnection(PacketFlow.SERVERBOUND), instance, new CommonListenerCookie(current, 0, instance.clientInformation(), false, null, new java.util.HashSet<>(), new io.papermc.paper.util.KeepAlive()));
             loadPlayerData(instance);

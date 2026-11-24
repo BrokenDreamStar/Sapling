@@ -136,6 +136,110 @@ def capture_client(name="ExtrasWatch"):
     return client, captured, original
 
 
+def phase_limits():
+    print("## bot limits (global + per-player fallback)")
+    results = {}
+
+    set_yml("limit", "1")
+    set_yml("player-limit", "-1")
+    run(SAPLING_RUN, "--stop")
+    run(SAPLING_RUN, "--reset-world", "--wait-ready")
+    with parity.Rcon("127.0.0.1", RCON_PORT, "parity") as rcon:
+        rcon.command("/gamerule spawn_mobs false")
+        first_reply = rcon.command("/player BotOne spawn")
+        deadline = time.monotonic() + 15
+        first_entity = ""
+        while time.monotonic() < deadline:
+            first_entity = rcon.command("/execute if entity BotOne")
+            if "Test passed" in first_entity:
+                break
+            time.sleep(0.2)
+        second_reply = rcon.command("/player BotTwo spawn")
+        time.sleep(1.5)
+        second_entity = rcon.command("/execute if entity BotTwo")
+        listed = rcon.command("/list")
+        rcon.command("/player BotOne kill")
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if "Test failed" in rcon.command("/execute unless entity BotOne"):
+                break
+            time.sleep(0.2)
+        rcon.command("/player BotOne kill")
+        time.sleep(0.5)
+        retry_reply = rcon.command("/player BotTwo spawn")
+        deadline = time.monotonic() + 15
+        retry_entity = ""
+        while time.monotonic() < deadline:
+            retry_entity = rcon.command("/execute if entity BotTwo")
+            if "Test passed" in retry_entity:
+                break
+            time.sleep(0.2)
+        rcon.command("/player BotTwo kill")
+        results["global"] = {
+            "first": first_entity, "second_reply": second_reply, "second": second_entity,
+            "list": listed, "retry_reply": retry_reply, "retry": retry_entity,
+        }
+    run(SAPLING_RUN, "--stop")
+    print("  global limit:", results["global"])
+
+    set_yml("limit", "10")
+    set_yml("player-limit", "1")
+    run(SAPLING_RUN, "--stop")
+    run(SAPLING_RUN, "--reset-world", "--wait-ready")
+    client, captured, original = capture_client("LimitOwner")
+    try:
+        client.wait_play(25)
+        with parity.Rcon("127.0.0.1", RCON_PORT, "parity") as rcon:
+            rcon.command("/gamerule spawn_mobs false")
+            rcon.command("/op LimitOwner")
+            time.sleep(1.0)
+            client.send_chat_command("player LimBotA spawn")
+            deadline = time.monotonic() + 15
+            allowed = ""
+            while time.monotonic() < deadline:
+                allowed = rcon.command("/execute if entity LimBotA")
+                if "Test passed" in allowed:
+                    break
+                time.sleep(0.2)
+            client.send_chat_command("player LimBotB spawn")
+            time.sleep(2.5)
+            denied = rcon.command("/execute if entity LimBotB")
+            console_reply = rcon.command("/player ConsoleBot spawn")
+            deadline = time.monotonic() + 15
+            console_entity = ""
+            while time.monotonic() < deadline:
+                console_entity = rcon.command("/execute if entity ConsoleBot")
+                if "Test passed" in console_entity:
+                    break
+                time.sleep(0.2)
+            for name in ("LimBotA", "LimBotB", "ConsoleBot"):
+                rcon.command("/player " + name + " kill")
+            rcon.command("/deop LimitOwner")
+            results["player"] = {
+                "allowed": allowed, "denied": denied,
+                "console_reply": console_reply, "console_entity": console_entity,
+            }
+        run(SAPLING_RUN, "--stop")
+    finally:
+        mc_client.MinecraftClient._recv_packet = original
+        client.close()
+        run(SAPLING_RUN, "--stop")
+    print("  player limit:", results["player"])
+
+    set_yml("limit", "10")
+    set_yml("player-limit", "-1")
+    ok = (
+        "Test passed" in results["global"]["first"]
+        and "Bot number limit exceeded" in results["global"]["second_reply"]
+        and "Test failed" in results["global"]["second"]
+        and "Test passed" in results["global"]["retry"]
+        and "Test passed" in results["player"]["allowed"]
+        and "Test failed" in results["player"]["denied"]
+        and "Test passed" in results["player"]["console_entity"]
+    )
+    return ok
+
+
 def phase_skin():
     print("## cache-skin")
     results = {}
@@ -357,17 +461,18 @@ def main():
     # make sure the new config keys exist in leaves.yml (first start writes defaults)
     with open(LEAVES_YML, "r", encoding="utf-8") as handle:
         config_text = handle.read()
-    if "prefix:" not in config_text:
+    if "luckperms-meta-key:" not in config_text:
         run(SAPLING_RUN, "--reset-world", "--wait-ready")
         run(SAPLING_RUN, "--stop")
     ok = True
-    for name, phase in (("names", phase_names), ("skin", phase_skin), ("sleep", phase_sleep), ("phantom", phase_phantom)):
+    for name, phase in (("names", phase_names), ("limits", phase_limits), ("skin", phase_skin),
+                        ("sleep", phase_sleep), ("phantom", phase_phantom)):
         passed = phase()
         print(name + ": " + ("MATCH" if passed else "FAILED"))
         ok = ok and passed
     # restore defaults (all features off, Carpet parity)
     for key, value in (("cache-skin", "false"), ("skip-sleep-check", "false"), ("spawn-phantom", "false"),
-                       ("prefix", '""'), ("suffix", '""')):
+                       ("prefix", '""'), ("suffix", '""'), ("limit", "10"), ("player-limit", "-1")):
         set_yml(key, value)
     set_yml_list("unable-fakeplayer-names", [])
     run(SAPLING_RUN, "--stop")

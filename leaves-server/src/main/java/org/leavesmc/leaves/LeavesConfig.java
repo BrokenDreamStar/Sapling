@@ -154,6 +154,19 @@ public final class LeavesConfig {
 
         @GlobalConfig("unable-fakeplayer-names")
         public List<String> unableFakeplayerNames = List.of();
+
+        // Sapling - restored Leaves bot count limit (0 or negative = unlimited)
+        @GlobalConfig("limit")
+        public int limit = 10;
+
+        // Sapling - default per-player creation limit when LuckPerms has no meta value
+        // (0 or negative = unlimited); LuckPerms meta key below overrides it per user/group
+        @GlobalConfig("player-limit")
+        public int playerLimit = -1;
+
+        // Sapling - LuckPerms meta key used for per-player/group bot limits
+        @GlobalConfig("luckperms-meta-key")
+        public String luckPermsMetaKey = "sapling-bot-limit";
     }
 
     @GlobalConfigCategory("modify")
