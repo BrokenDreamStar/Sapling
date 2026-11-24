@@ -106,7 +106,7 @@ The harness never builds the project. Build the server jar yourself first:
 ~~~
 
 run-sapling.sh picks the runnable jar automatically: it prefers
-leaves-server/build/libs/sapling-leavesclip-*.jar (the Paperclip equivalent),
+leaves-server/build/libs/sapling-*.jar (the runnable release jar),
 then the newest non-sources/non-javadoc/non-bundler jar. You can also pass an
 explicit jar path as the first argument or via SAPLING_JAR.
 

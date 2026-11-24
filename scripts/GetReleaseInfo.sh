@@ -30,7 +30,7 @@ make_latest=$([ "$preVersion" = "true" ] && echo "false" || echo "true")
 rm -f $discordmes
 rm -f $releaseinfo
 
-mv leaves-server/build/libs/sapling-leavesclip-"$gradleVersion"-mojmap.jar "$jarName"
+mv leaves-server/build/libs/sapling-"$gradleVersion".jar "$jarName"
 {
   echo "name=$leavesid"
   echo "tag=$tagid"
