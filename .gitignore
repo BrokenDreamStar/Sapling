@@ -61,3 +61,9 @@ run
 **/build/
 __pycache__/
 *.pyc
+
+# local-only working files (not part of the repository; maintained per maintainer request)
+/README.md
+/AGENTS.md
+/starm/
+/tools/
