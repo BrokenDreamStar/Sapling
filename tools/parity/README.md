@@ -157,6 +157,7 @@ python3 tools/parity/check-listing.py   # allowListingFakePlayers=true ping-samp
 python3 tools/parity/check-permissions.py  # commandPlayer permission branch
 python3 tools/parity/check-shadow.py    # /player shadow with a real protocol client
 python3 tools/parity/check-client-permissions.py  # /player permission matrix from a real client
+python3 tools/parity/check-leaves-extras.py  # restored Leaves extras: skin cache, sleep skip, phantoms
 ```
 
 `run-suite.sh` stops both servers, resets their worlds, restarts them and runs
@@ -348,6 +349,36 @@ Notes on the config schema: `fakeplayer.command-player` accepts the carpet forms
 `ops`, `true`/`false` and `0`..`4`; unquoted YAML booleans/numbers are normalised by
 `CommandPlayerConfigValidator` so `command-player: false` behaves like carpet
 instead of silently falling back to the default.
+
+## Sapling extensions (restored Leaves fake-player features)
+
+The Carpet port itself is a behaviour-for-behaviour replacement; these three
+optional features are restored Leaves bot capabilities layered on top of it.
+They all live in `settings.fakeplayer` in leaves.yml and default to `false`,
+so the Carpet-parity checks above are unaffected unless they are enabled.
+
+- **cache-skin** (default `false`): when spawning a fake player, resolve the
+  Mojang profile for its name and attach (and remember in memory) the
+  `textures` property, so clients render the account's real skin. The lookup
+  uses `api.mojang.com` + `sessionserver.mojang.com`; if the JVM needs a proxy
+  pass `-Dhttps.proxyHost=... -Dhttps.proxyPort=...` (the parity script does this
+  via `PARITY_JAVA_OPTS`). Failures fall back to the normal (offline/default)
+  skin. Note this makes the spawn wait for the lookup result.
+- **skip-sleep-check** (default `false`): fake players get `fauxSleeping=true`,
+  so they count as sleeping in `SleepStatus` without lying in a bed and
+  contribute to the `players_sleeping_percentage` night-skip check. Vanilla
+  still requires at least one player who is actually deep-sleeping before the
+  night is skipped, exactly like before.
+- **spawn-phantom** (default `false`): controls phantom spawning for fake
+  players. With `false` fake players are skipped by the phantom spawner (they do
+  not accumulate real insomnia stats); with `true` their own insomnia counter
+  (`FakePlayer.notSleepTicks`, reset after sleeping through a night) is used
+  instead of the vanilla `time_since_rest` statistic.
+
+`check-leaves-extras.py` exercises all three with a real protocol client and
+asserts the observable behaviour (skin property in PlayerInfoUpdate, clock jump
+on a 100%% sleeping percentage, phantom spawn only when enabled); it needs
+network/proxy access for the skin phase.
 
 ## Troubleshooting
 

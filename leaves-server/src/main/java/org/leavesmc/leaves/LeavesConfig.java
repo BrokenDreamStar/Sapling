@@ -134,6 +134,16 @@ public final class LeavesConfig {
 
         @GlobalConfig("allow-listing-fake-players")
         public boolean allowListingFakePlayers = false;
+
+        // Sapling - restored Leaves fake-player features (default off, Carpet parity preserved)
+        @GlobalConfig("cache-skin")
+        public boolean useSkinCache = false;
+
+        @GlobalConfig("skip-sleep-check")
+        public boolean skipSleepCheck = false;
+
+        @GlobalConfig("spawn-phantom")
+        public boolean spawnPhantom = false;
     }
 
     @GlobalConfigCategory("modify")

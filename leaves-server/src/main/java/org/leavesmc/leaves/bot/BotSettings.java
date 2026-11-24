@@ -24,4 +24,19 @@ public final class BotSettings {
     public static boolean allowListingFakePlayers() {
         return LeavesConfig.fakeplayer.allowListingFakePlayers;
     }
+
+    /** Sapling extension (from Leaves): fetch and cache Mojang skin textures for fake players. */
+    public static boolean useSkinCache() {
+        return LeavesConfig.fakeplayer.useSkinCache;
+    }
+
+    /** Sapling extension (from Leaves): bots count as sleeping without a bed (fake sleeping). */
+    public static boolean skipSleepCheck() {
+        return LeavesConfig.fakeplayer.skipSleepCheck;
+    }
+
+    /** Sapling extension (from Leaves): fake players accumulate insomnia and spawn phantoms. */
+    public static boolean spawnPhantom() {
+        return LeavesConfig.fakeplayer.spawnPhantom;
+    }
 }

@@ -2,7 +2,10 @@
 // https://github.com/gnembon/fabric-carpet (branch 26.1)
 package org.leavesmc.leaves.bot;
 
+import com.google.common.collect.ImmutableMultimap;
 import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.properties.Property;
+import com.mojang.authlib.properties.PropertyMap;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.chat.Component;
@@ -51,6 +54,7 @@ public class FakePlayer extends ServerPlayer
 
     public Runnable fixStartingPosition = () -> {};
     public boolean isAShadow;
+    public int notSleepTicks; // Sapling - fake player insomnia counter (Leaves spawn-phantom)
 
     // Returns true if it was successful, false if couldn't spawn due to the player not existing in Mojang servers
     public static boolean createFake(String username, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying)
@@ -80,7 +84,15 @@ public class FakePlayer extends ServerPlayer
         String name = gameprofile.name();
         spawning.add(name);
 
-        fetchGameProfile(server, gameprofile.id()).whenCompleteAsync((p, t) -> {
+        CompletableFuture<ProfileAndSkin> profileFuture = fetchGameProfile(server, gameprofile.id())
+            .thenApply(profile -> new ProfileAndSkin(profile, null));
+        if (BotSettings.useSkinCache())
+        {
+            // Sapling - restored Leaves skin cache: resolve Mojang textures async and attach them
+            profileFuture = profileFuture.thenCombine(MojangAPI.getSkinAsync(username),
+                (profileAndSkin, skin) -> new ProfileAndSkin(profileAndSkin.profile(), skin));
+        }
+        profileFuture.whenCompleteAsync((profileAndSkin, t) -> {
             // Always remove the name, even if exception occurs
             spawning.remove(name);
             if (t != null)
@@ -89,11 +101,15 @@ public class FakePlayer extends ServerPlayer
             }
 
             GameProfile current;
-            if (p.name().isEmpty()) {
+            if (profileAndSkin.profile().name().isEmpty()) {
                 current = gameprofile;
             }
             else {
-                current = p;
+                current = profileAndSkin.profile();
+            }
+            // Sapling - apply the cached skin to whichever profile is used (offline resolution can be empty)
+            if (profileAndSkin.skin() != null) {
+                current = withSkin(current, profileAndSkin.skin());
             }
 
             FakePlayer instance = new FakePlayer(server, worldIn, current, ClientInformation.createDefault(), false);
@@ -113,6 +129,21 @@ public class FakePlayer extends ServerPlayer
             instance.getAbilities().flying = flying;
         }, server);
         return true;
+    }
+
+    private record ProfileAndSkin(GameProfile profile, String[] skin) {
+    }
+
+    /** Sapling - attach the cached Mojang textures property to an immutable authlib GameProfile. */
+    private static GameProfile withSkin(GameProfile profile, String[] skin) {
+        if (skin == null || skin.length < 2) {
+            return profile;
+        }
+        ImmutableMultimap.Builder<String, Property> builder = ImmutableMultimap.builder();
+        builder.putAll(profile.properties());
+        builder.put("textures", new Property("textures", skin[0], skin[1]));
+        GameProfile profileWithSkin = new GameProfile(profile.id(), profile.name(), new PropertyMap(builder.build()));
+        return profileWithSkin;
     }
 
     private static CompletableFuture<GameProfile> fetchGameProfile(MinecraftServer server, final UUID name) {
@@ -173,6 +204,8 @@ public class FakePlayer extends ServerPlayer
     {
         super(server, worldIn, profile, cli);
         this.isAShadow = shadow;
+        // Sapling - restored Leaves skip-sleep-check: fake players count as sleeping without a bed
+        this.fauxSleeping = BotSettings.skipSleepCheck();
     }
 
     @Override
@@ -203,6 +236,15 @@ public class FakePlayer extends ServerPlayer
     @Override
     public void tick()
     {
+        // Sapling - restored Leaves spawn-phantom: accumulate insomnia while not resting
+        if (BotSettings.spawnPhantom())
+        {
+            this.notSleepTicks++;
+        }
+        if (this.isSleeping() && this.sleepCounter > 100)
+        {
+            this.notSleepTicks = 0;
+        }
         if (this.level().getServer().getTickCount() % 10 == 0)
         {
             this.connection.resetPosition();

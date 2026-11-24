@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: BrokenDream_Star <shuqiwang179@gmail.com>
+Date: Tue, 24 Nov 2026 13:25:41 +0800
+Subject: [PATCH] Add Sapling fake player extras: phantom insomnia support
+
+
+diff --git a/net/minecraft/world/level/levelgen/PhantomSpawner.java b/net/minecraft/world/level/levelgen/PhantomSpawner.java
+index dfec8a0dfac93d98a69f9d1516f0436feb7b0777..16126b6079e63af51a3c862f166c246c6b10d52a 100644
+--- a/net/minecraft/world/level/levelgen/PhantomSpawner.java
++++ b/net/minecraft/world/level/levelgen/PhantomSpawner.java
+@@ -47,6 +47,14 @@ public class PhantomSpawner implements CustomSpawner {
+                                     if (difficulty.isHarderThan(random.nextFloat() * 3.0F)) {
+                                         ServerStatsCounter stats = player.getStats();
+                                         int value = Mth.clamp(stats.getValue(Stats.CUSTOM.get(Stats.TIME_SINCE_REST)), 1, Integer.MAX_VALUE);
++                                        // Sapling start - fake player insomnia (restored Leaves spawn-phantom)
++                                        if (player instanceof org.leavesmc.leaves.bot.FakePlayer fakePlayer) {
++                                            if (!org.leavesmc.leaves.bot.BotSettings.spawnPhantom()) {
++                                                continue;
++                                            }
++                                            value = Mth.clamp(fakePlayer.notSleepTicks, 1, Integer.MAX_VALUE);
++                                        }
++                                        // Sapling end
+                                         int dayLength = 24000;
+                                         if (random.nextInt(value) >= level.paperConfig().entities.behavior.playerInsomniaStartTicks) { // Paper - Ability to control player's insomnia and phantoms
+                                             BlockPos spawnPos = playerPos.above(20 + random.nextInt(15))
