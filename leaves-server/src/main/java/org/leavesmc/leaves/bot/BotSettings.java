@@ -39,4 +39,24 @@ public final class BotSettings {
     public static boolean spawnPhantom() {
         return LeavesConfig.fakeplayer.spawnPhantom;
     }
+
+    /** Sapling extension (from Leaves): optional prefix for spawned fake player names. */
+    public static String prefix() {
+        return LeavesConfig.fakeplayer.prefix;
+    }
+
+    /** Sapling extension (from Leaves): optional suffix for spawned fake player names. */
+    public static String suffix() {
+        return LeavesConfig.fakeplayer.suffix;
+    }
+
+    /** Leaves BotUtil.getFullName: prefix + raw name + suffix. */
+    public static String getFullName(String rawName) {
+        return prefix() + rawName + suffix();
+    }
+
+    /** Leaves unable-fakeplayer-names: names that /player <name> spawn refuses to create. */
+    public static boolean isUnableName(String name) {
+        return LeavesConfig.fakeplayer.unableFakeplayerNames.contains(name);
+    }
 }

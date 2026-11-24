@@ -59,6 +59,15 @@ public class FakePlayer extends ServerPlayer
     // Returns true if it was successful, false if couldn't spawn due to the player not existing in Mojang servers
     public static boolean createFake(String username, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying)
     {
+        return createFake(username, username, server, pos, yaw, pitch, dimensionId, gamemode, flying);
+    }
+
+    /**
+     * Sapling - {@code skinName} is the raw name used for the Mojang skin lookup (Leaves naming:
+     * the visible name may carry a prefix/suffix while the skin account is the raw name).
+     */
+    public static boolean createFake(String username, String skinName, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying)
+    {
         //prolly half of that crap is not necessary, but it works
         ServerLevel worldIn = server.getLevel(dimensionId);
         server.services().nameToIdCache().resolveOfflineUsers(false);
@@ -89,7 +98,7 @@ public class FakePlayer extends ServerPlayer
         if (BotSettings.useSkinCache())
         {
             // Sapling - restored Leaves skin cache: resolve Mojang textures async and attach them
-            profileFuture = profileFuture.thenCombine(MojangAPI.getSkinAsync(username),
+            profileFuture = profileFuture.thenCombine(MojangAPI.getSkinAsync(skinName),
                 (profileAndSkin, skin) -> new ProfileAndSkin(profileAndSkin.profile(), skin));
         }
         profileFuture.whenCompleteAsync((profileAndSkin, t) -> {

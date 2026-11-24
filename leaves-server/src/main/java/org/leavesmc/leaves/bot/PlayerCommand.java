@@ -184,9 +184,17 @@ public class PlayerCommand
 
     private static boolean cantSpawn(CommandContext<CommandSourceStack> context)
     {
-        String playerName = StringArgumentType.getString(context, "player");
+        String rawName = StringArgumentType.getString(context, "player");
+        String playerName = BotSettings.getFullName(rawName);
         MinecraftServer server = context.getSource().getServer();
         PlayerList manager = server.getPlayerList();
+
+        // Sapling - restored Leaves unable-fakeplayer-names blacklist (checked on raw and final name)
+        if (BotSettings.isUnableName(rawName) || BotSettings.isUnableName(playerName))
+        {
+            Messenger.m(context.getSource(), "r This name is not allowed in this server");
+            return true;
+        }
 
         if (FakePlayer.isSpawningPlayer(playerName))
         {
@@ -299,7 +307,9 @@ public class PlayerCommand
             // Force override flying to false for survival-like players, or they will fly too
             flying = false;
         }
-        String playerName = StringArgumentType.getString(context, "player");
+        String rawName = StringArgumentType.getString(context, "player");
+        // Sapling - restored Leaves prefix/suffix naming (prefix + raw name + suffix)
+        String playerName = BotSettings.getFullName(rawName);
         if (playerName.length() > maxNameLength(source.getServer()))
         {
             Messenger.m(source, "rb Player name: " + playerName + " is too long");
@@ -311,7 +321,7 @@ public class PlayerCommand
             Messenger.m(source, "rb Player " + playerName + " cannot be placed outside of the world");
             return 0;
         }
-        boolean success = FakePlayer.createFake(playerName, source.getServer(), pos, facing.y, facing.x, dimType, mode, flying);
+        boolean success = FakePlayer.createFake(playerName, rawName, source.getServer(), pos, facing.y, facing.x, dimType, mode, flying);
         if (!success) {
             Messenger.m(source, "rb Player " + playerName + " doesn't exist and cannot spawn in online mode. " +
                     "Turn the server offline or the allowSpawningOfflinePlayers on to spawn non-existing players");

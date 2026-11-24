@@ -144,6 +144,16 @@ public final class LeavesConfig {
 
         @GlobalConfig("spawn-phantom")
         public boolean spawnPhantom = false;
+
+        // Sapling - restored Leaves fake-player naming/blacklist options
+        @GlobalConfig("prefix")
+        public String prefix = "";
+
+        @GlobalConfig("suffix")
+        public String suffix = "";
+
+        @GlobalConfig("unable-fakeplayer-names")
+        public List<String> unableFakeplayerNames = List.of();
     }
 
     @GlobalConfigCategory("modify")

@@ -57,6 +57,22 @@ def set_yml(key, value):
         handle.write(updated)
 
 
+def set_yml_list(key, values):
+    with open(LEAVES_YML, "r", encoding="utf-8") as handle:
+        text = handle.read()
+    pattern = r"(\n    " + re.escape(key) + r":)(?:[^\n]*)(?:\n    - [^\n]*)*"
+    if re.search(pattern, text) is None:
+        raise SystemExit("could not find " + key + " in leaves.yml")
+    replacement = "\n    " + key + ":"
+    if values:
+        replacement += "".join("\n    - " + value for value in values)
+    else:
+        replacement += " []"
+    updated = re.sub(pattern, replacement, text, count=1)
+    with open(LEAVES_YML, "w", encoding="utf-8") as handle:
+        handle.write(updated)
+
+
 def set_paper_values():
     with open(PAPER_WORLD, "r", encoding="utf-8") as handle:
         text = handle.read()
@@ -261,18 +277,99 @@ def phase_phantom():
     return ok
 
 
+def phase_names():
+    print("## prefix/suffix + unable-fakeplayer-names")
+    results = {}
+
+    set_yml("prefix", '"Pre"')
+    set_yml("suffix", '"Suf"')
+    run(SAPLING_RUN, "--stop")
+    run(SAPLING_RUN, "--reset-world", "--wait-ready")
+    with parity.Rcon("127.0.0.1", RCON_PORT, "parity") as rcon:
+        rcon.command("/gamerule spawn_mobs false")
+        reply = rcon.command("/player NameTest spawn")
+        deadline = time.monotonic() + 15
+        full_entity = ""
+        while time.monotonic() < deadline:
+            full_entity = rcon.command("/execute if entity PreNameTestSuf")
+            if "Test passed" in full_entity:
+                break
+            time.sleep(0.2)
+        raw_entity = rcon.command("/execute if entity NameTest")
+        listed = rcon.command("/list")
+        # subsequent commands must use the final name
+        move_reply = rcon.command("/player PreNameTestSuf move forward")
+        rcon.command("/player PreNameTestSuf stop")
+        rcon.command("/player PreNameTestSuf kill")
+        results["prefix_suffix"] = {
+            "spawn_reply": reply,
+            "full_entity": full_entity,
+            "raw_entity": raw_entity,
+            "list_has_full": "PreNameTestSuf" in listed,
+            "move_reply": move_reply,
+        }
+    run(SAPLING_RUN, "--stop")
+    print("  prefix/suffix:", results["prefix_suffix"])
+
+    set_yml("prefix", '""')
+    set_yml("suffix", '""')
+    set_yml_list("unable-fakeplayer-names", ["Blocked"])
+    run(SAPLING_RUN, "--stop")
+    run(SAPLING_RUN, "--reset-world", "--wait-ready")
+    with parity.Rcon("127.0.0.1", RCON_PORT, "parity") as rcon:
+        rcon.command("/gamerule spawn_mobs false")
+        blocked_reply = rcon.command("/player Blocked spawn")
+        blocked_entity = rcon.command("/execute if entity Blocked")
+        allowed_reply = rcon.command("/player AllowedName spawn")
+        deadline = time.monotonic() + 15
+        allowed_entity = ""
+        while time.monotonic() < deadline:
+            allowed_entity = rcon.command("/execute if entity AllowedName")
+            if "Test passed" in allowed_entity:
+                break
+            time.sleep(0.2)
+        rcon.command("/player AllowedName kill")
+        results["blacklist"] = {
+            "blocked_reply": blocked_reply,
+            "blocked_entity": blocked_entity,
+            "allowed_reply": allowed_reply,
+            "allowed_entity": allowed_entity,
+        }
+    run(SAPLING_RUN, "--stop")
+    print("  blacklist:", results["blacklist"])
+
+    set_yml_list("unable-fakeplayer-names", [])
+    ok = (
+        "Test passed" in results["prefix_suffix"]["full_entity"]
+        and "Test failed" in results["prefix_suffix"]["raw_entity"]
+        and results["prefix_suffix"]["list_has_full"]
+        and "not allowed" in results["blacklist"]["blocked_reply"]
+        and "Test failed" in results["blacklist"]["blocked_entity"]
+        and "Test passed" in results["blacklist"]["allowed_entity"]
+    )
+    return ok
+
+
 def main():
     if not os.path.exists(LEAVES_YML):
         raise SystemExit("sapling leaves.yml not found; start the parity sapling server once")
     run("run-carpet.sh", "--stop")
+    # make sure the new config keys exist in leaves.yml (first start writes defaults)
+    with open(LEAVES_YML, "r", encoding="utf-8") as handle:
+        config_text = handle.read()
+    if "prefix:" not in config_text:
+        run(SAPLING_RUN, "--reset-world", "--wait-ready")
+        run(SAPLING_RUN, "--stop")
     ok = True
-    for name, phase in (("skin", phase_skin), ("sleep", phase_sleep), ("phantom", phase_phantom)):
+    for name, phase in (("names", phase_names), ("skin", phase_skin), ("sleep", phase_sleep), ("phantom", phase_phantom)):
         passed = phase()
         print(name + ": " + ("MATCH" if passed else "FAILED"))
         ok = ok and passed
     # restore defaults (all features off, Carpet parity)
-    for key, value in (("cache-skin", "false"), ("skip-sleep-check", "false"), ("spawn-phantom", "false")):
+    for key, value in (("cache-skin", "false"), ("skip-sleep-check", "false"), ("spawn-phantom", "false"),
+                       ("prefix", '""'), ("suffix", '""')):
         set_yml(key, value)
+    set_yml_list("unable-fakeplayer-names", [])
     run(SAPLING_RUN, "--stop")
     print("leaves extras: " + ("MATCH" if ok else "FAILED"))
     return 0 if ok else 1

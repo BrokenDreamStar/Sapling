@@ -374,6 +374,15 @@ so the Carpet-parity checks above are unaffected unless they are enabled.
   not accumulate real insomnia stats); with `true` their own insomnia counter
   (`FakePlayer.notSleepTicks`, reset after sleeping through a night) is used
   instead of the vanilla `time_since_rest` statistic.
+- **prefix** / **suffix** (default `""`): `/player <raw> spawn` creates the fake
+  player under the visible name `prefix + raw + suffix` (Leaves naming). The raw
+  name is still used for the Mojang skin lookup, and every later Carpet command
+  has to use the final name (same as Leaves). With the defaults the name is
+  exactly the argument, so Carpet parity is unchanged.
+- **unable-fakeplayer-names** (default `[]`): blacklist checked by
+  `/player <name> spawn` before creating anything (both the raw argument and the
+  final prefixed/suffixed name are checked). A blocked name is refused with
+  `This name is not allowed in this server`. Default empty keeps Carpet parity.
 
 `check-leaves-extras.py` exercises all three with a real protocol client and
 asserts the observable behaviour (skin property in PlayerInfoUpdate, clock jump
