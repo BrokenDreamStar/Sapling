@@ -1,0 +1,161 @@
+name: Paper upstream sync
+
+# 每周检查一次 Paper 版本分支：发现新提交后自动 bump paperRef、apply/build/rebuild 补丁并开 PR。
+# 26.1.2 对应的 ver/26.1.2 已基本冻结，所以当前用低频 schedule；
+# 升级到 26.3/26.4 后把 paper_branch 默认值改为对应分支即可恢复常规同步。
+on:
+  schedule:
+    - cron: '0 18 * * 0'
+  workflow_dispatch:
+    inputs:
+      paper_branch:
+        description: Paper branch to track (e.g. ver/26.1.2)
+        type: string
+        required: false
+      force:
+        description: Run the sync job even when no upstream change is detected
+        type: boolean
+        default: false
+
+concurrency:
+  group: paper-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  PAPER_REPO: PaperMC/Paper
+  TARGET_BRANCH: main
+  GH_REPO: "${{ github.repository }}"
+
+jobs:
+  check:
+    if: github.repository == 'BrokenDreamStar/Sapling'
+    runs-on: ubuntu-latest
+    outputs:
+      update: ${{ steps.cmp.outputs.update }}
+      old: ${{ steps.cmp.outputs.old }}
+      new: ${{ steps.cmp.outputs.new }}
+      branch: ${{ steps.cmp.outputs.branch }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare Paper branch with paperRef
+        id: cmp
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_BRANCH: ${{ inputs.paper_branch }}
+        run: |
+          set -eo pipefail
+          BRANCH="$INPUT_BRANCH"
+          if [ -z "$BRANCH" ]; then BRANCH="ver/26.1.2"; fi
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          ENC=$(printf '%s' "$BRANCH" | sed 's|/|%2F|g')
+          OLD=$(grep '^paperRef=' gradle.properties | cut -d= -f2)
+          NEW=""
+          if NEW=$(gh api "repos/$PAPER_REPO/commits/$ENC" --jq .sha 2>/dev/null); then
+            :
+          else
+            echo "::warning::Paper branch $BRANCH not found; skip"
+            NEW=""
+          fi
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          echo "old=$OLD" >> "$GITHUB_OUTPUT"
+          if [ -n "$NEW" ] && [ "$NEW" != "$OLD" ]; then
+            echo "update=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "update=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "paper branch=$BRANCH old=$OLD new=$NEW"
+
+  sync:
+    needs: check
+    if: github.repository == 'BrokenDreamStar/Sapling' && (needs.check.outputs.update == 'true' || inputs.force == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '25'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          add-job-summary: never
+          cache-read-only: false
+      - name: Bump paperRef
+        env:
+          NEW: ${{ needs.check.outputs.new }}
+        run: |
+          set -eo pipefail
+          if [ -z "$NEW" ]; then NEW=$(grep '^paperRef=' gradle.properties | cut -d= -f2); fi
+          sed -i "s/^paperRef=.*/paperRef=$NEW/" gradle.properties
+          grep '^paperRef=' gradle.properties
+      - name: Apply patches
+        run: ./gradlew applyAllPatches --stacktrace
+      - name: Build leavesclip jar
+        run: ./gradlew createLeavesclipJar --stacktrace
+      - name: Rebuild patches
+        run: ./gradlew rebuildPaperPatches :leaves-server:rebuildAllServerPatches --stacktrace
+      - name: Open sync PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OLD: ${{ needs.check.outputs.old }}
+          NEW: ${{ needs.check.outputs.new }}
+          PAPER_BRANCH: ${{ needs.check.outputs.branch }}
+        run: |
+          set -eo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if [ -z "$(git status --porcelain)" ]; then
+            echo '::notice::no changes after apply/rebuild; nothing to PR'
+            exit 0
+          fi
+          BR="chore/paper-sync-$GITHUB_RUN_NUMBER"
+          OLD8=$(printf '%s' "$OLD" | cut -c1-8)
+          NEW8=$(printf '%s' "$NEW" | cut -c1-8)
+          git checkout -b "$BR"
+          git add gradle.properties leaves-api leaves-server
+          {
+            echo '## Paper upstream sync'
+            echo
+            echo "- Paper branch: $PAPER_BRANCH"
+            echo "- old: $OLD8"
+            echo "- new: $NEW8"
+            echo "- compare: https://github.com/$PAPER_REPO/compare/$OLD...$NEW"
+            echo
+            echo '### Paper changes'
+            gh api "repos/$PAPER_REPO/compare/$OLD...$NEW" --jq '.commits[] | "- " + .sha[0:8] + " " + .commit.committer.date[0:10] + " " + (.commit.message | split("\n")[0])' | head -50 || true
+            echo
+            echo '### Checklist'
+            echo '- [ ] review patch rebuild diff'
+            echo '- [ ] run parity harness before merge'
+            echo '- [ ] merge after CI green'
+          } > /tmp/pr-body.md
+          git commit -m "chore: sync Paper $OLD8 -> $NEW8"
+          git push origin "$BR"
+          gh label create paper-sync --repo "$GH_REPO" --color FBCA04 --description 'Automated Paper upstream sync' >/dev/null 2>&1 || true
+          gh pr create --repo "$GH_REPO" --base "$TARGET_BRANCH" --head "$BR" --title "chore: sync Paper $OLD8 -> $NEW8" --body-file /tmp/pr-body.md --label paper-sync
+
+  notify-failure:
+    needs: [check, sync]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create failure issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BRANCH: ${{ needs.check.outputs.branch }}
+        run: |
+          set -eo pipefail
+          gh label create paper-sync-failure --repo "$GH_REPO" --color D93F0B --description 'Paper sync failure' >/dev/null 2>&1 || true
+          gh issue create --repo "$GH_REPO" --title "Paper sync failed ($(date -u +%Y-%m-%d))" --label paper-sync-failure --body "Paper sync workflow failed.
+
+          Run: $RUN_URL
+          Target Paper branch: $BRANCH
+          Local repro: bump paperRef in gradle.properties, then run ./gradlew applyAllPatches and ./gradlew rebuildPaperPatches rebuildAllServerPatches."
